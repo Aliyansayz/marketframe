@@ -22,25 +22,22 @@ class  indicators_lookback_mode( access_indicators ):
 
     ha_ohlc_list = indicator.get_heikin_ashi (bar_list = refine_list, lookback = lookback, ohlc_data=True)
 
-    crossover_direction_list   =  indicator.crossover_direction_lookback(bar_list = refine_list, ema_period = ema_period ,lookback = lookback )
+    crossover_direction_list   =  indicator.crossover_direction_lookback(bar_list = refine_list, ema_period = ema_period, lookback = lookback)
 
-    stochastic_momentum_list =  indicator.stochastic_momentum_lookback( bar_list = refine_list, period = 10 , lookback = lookback, ema_period = ema_period[0])
+    stochastic_momentum_list =  indicator.stochastic_momentum_lookback(bar_list = refine_list, period = ema_period[1], lookback = lookback, ema_period = ema_period[0])
 
     emaz_list  =  indicator.ema_lookback( bar_list = refine_list, lookback = lookback , ema_period = ema_period )
 
     atr_bands_list = indicator.atr_bands_lookback( refine_list , multiplier,  period = atr_period ,  lookback = lookback  )
     adx_value_list = indicator.adx_lookback( bar_list = refine_list,   period = adx_period , lookback = lookback)
 
-    # fractal_status_list  = indicator.get_fractal( bar_list, lookback = lookback)
+    
     bollinger_bands_list = indicator.get_bollinger_bands( bar_list, lookback = lookback )
 
     # lookback = 10
-    # dt   = np.dtype([ ('index', 'datetime64[h]'),  ('symbol', 'U20'), ('Close', float ), ('Fractal-Status', 'U10'), ('Heikin-Ashi-Status', 'U10'),  ('Direction', float), ('Average-Directional-Index', float), ('Crossover', float),   \
-    #                  ('Stop_Loss', float), ('Take_Profit', float),  ('ema20', float), ('ema5', float), ('bb_lower', float ), ('bb_upper', float), ('atr_lower', float), ('atr_upper', float )  ])
-# ('heikin-ashi-ohlc', object),
     dt   = np.dtype([ ('index', 'datetime64[h]'),  ('symbol', 'U20'), ('Open', float ), ('High', float ), ('Low', float),  ('Close', float ),  ('Heikin-Ashi-Status', 'U10'),  ('Direction', float), ('Average-Directional-Index', float), ('Crossover', float),   \
-              ('Stop_Loss', float), ('Take_Profit', float), ('ema5', float), ('ema20', float), ('smi', float), ('smi_5period_ema', float), ('bb_lower', float ), ('bb_upper', np.float64), ('atr_lower', float), ('atr_upper', float ), ('ha_open', float), ('ha_high', float),('ha_low', float),('ha_close', float)  ])
-#
+              ('Stop_Loss', float), ('Take_Profit', float), ('ema_low', float), ('ema_high', float), ('smi', float), ('smi_ema', float), ('bb_lower', float ), ('bb_upper', float), ('atr_lower', float), ('atr_upper', float ), ('ha_open', float), ('ha_high', float),('ha_low', float),('ha_close', float)  ])
+
 
     column_names = dt.names
     data = [[0]]  * len(refine_list[symbols])
@@ -93,14 +90,8 @@ class  indicators_lookback_mode( access_indicators ):
                       stop_loss   = upper_band[i]
                       take_profit = lower_band[i]
 
-                # ohlc_df[i] = ( index[i], symbol[i], close[i], fractal_status[i] , heikin_ashi_status[i], direction[i], adx_value[i], \
-                #                crossover[i], stop_loss, take_profit ,  ema20[i], ema5[i],  bb_lower[i], bb_upper[i], lower_band[i], upper_band[i]  )
-#               [ha_ohlc[0][i], ha_ohlc[1][i], ha_ohlc[2][i], ha_ohlc[3][i]],
-
                 ohlc_df[i] = ( index[i], symbol[i], open[i], high[i], low[i], close[i], heikin_ashi_status[i], direction[i], adx_value[i], \
                                crossover[i], stop_loss, take_profit,  short_ema[i], long_ema[i], smi[i], smi_ema[i],  bb_lower[i], bb_upper[i], lower_band[i], upper_band[i], ha_open[i], ha_high[i] , ha_low[i], ha_close[i]  )
-#
-
 
             data[sym] = ohlc_df
 
