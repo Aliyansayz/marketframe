@@ -705,11 +705,11 @@ class stochastic_momentum_index(stochastic_oscillator):
         return moving_end
 
 
-  def  stochastic_momentum_index(self, high, low, close, period= 10, ema_period = 5):
+  def  stochastic_momentum_index(self, high, low, close, period= 20, ema_period = 5):
 
       # calculate %K line
       # low , high , close  = low.reshape(-1,1) , high.reshape(-1,1) , close.reshape(-1,1)
-      lengthD = 3
+      lengthD = ema_period
       lowest_low   = self.moving_min(low  , period )
 
       highest_high = self.moving_max(high , period )
