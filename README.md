@@ -3,7 +3,6 @@ Tells us market prices in real time with technical indicators, crossover status.
 * Bollinger Bands
 * ATR Bands 
 * ADX value
-* Ichimoku Cloud (coming soon) 
 * Stochastic Momentum Index
 * Exponential Moving Average
 * Heikin Ashi Candles 
