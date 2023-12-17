@@ -29,12 +29,10 @@ class sorting :
 
       sort_index, signal_list  =  [], []
       for index, ohlc in enumerate(bar_df[sorting.values]):
-
-          # last_candles = 10
+          
           observe = ohlc[-last_candles:]
 
           volatile_adx = (observe['Average-Directional-Index'] > 18) &  (observe['Average-Directional-Index'] < 25)
-
           uptrend_bb_band     = observe[(observe['High'] > observe['bb_upper']) | (observe['Close'] > observe['bb_upper']) ]
           uptrend_heikin_ashi = observe['Heikin-Ashi-Status'] == 'Green'
 
@@ -57,12 +55,10 @@ class sorting :
       sort_index, signal_list  =  [], []
 
       for index, ohlc in enumerate(bar_df[sorting.values]):
-
-          # last_candles = 10
+          
           observe = ohlc[-last_candles:]
 
           volatile_adx = (observe['Average-Directional-Index'] > 18) &  (observe['Average-Directional-Index'] < 25)
-
           downtrend_bb_band      = (observe['Low'] < observe['bb_lower']) | (observe['Close'] < observe['bb_lower'])
           downtrend_heikin_ashi  = observe['Heikin-Ashi-Status'] == 'Red'
 
@@ -85,8 +81,7 @@ class sorting :
 
       sort_index, signal_list  =  [], []
       for index, ohlc in enumerate(bar_df[sorting.values]):
-
-          # last_candles = 3
+        
           observe = ohlc[-last_candles:]
 
           volatile_adx = (observe['Average-Directional-Index'] > 18) &  (observe['Average-Directional-Index'] < 25)
@@ -111,11 +106,9 @@ class sorting :
       sort_index, signal_list  =  [], []
       for index, ohlc in enumerate(bar_df[sorting.values]):
 
-          last_candles = 3
           observe = ohlc[-last_candles:]
 
           volatile_adx = (observe['Average-Directional-Index'] > 18) &  (observe['Average-Directional-Index'] < 25)
-
           mask_downtrend_crossover  = observe['Crossover'] == -1
           downtrend_heikin_ashi  = observe['Heikin-Ashi-Status'] == 'Red'
 
@@ -145,15 +138,19 @@ class sorting :
         return bar_df
 
     @classmethod
-    def  stochastic_momentum_uptrend(cls, bar_df, last_candles = 10 ):
+    def  stochastic_momentum_uptrend(cls, bar_df, last_candles = 10, cross_only= True  ):
 
       sort_index, signal_list = [] , []
       for index, ohlc in enumerate(bar_df[sorting.values]):
+
         observe = ohlc[-last_candles:]
+          
         volatile_adx = (observe['Average-Directional-Index'] > 18) & (observe['Average-Directional-Index'] < 25)
         mask_downtrend_crossover  = observe['crossover_smi']   == 1
         downtrend_heikin_ashi  = observe['Heikin-Ashi-Status'] == 'Green'
-        find    = volatile_adx & mask_downtrend_crossover & downtrend_heikin_ashi
+          
+        if cross_only:  find   =                mask_downtrend_crossover 
+        else :          find   = volatile_adx & mask_downtrend_crossover & downtrend_heikin_ashi
         matches = observe[find]
         if  len(matches) > 0 :
               sort_index.append(index)
@@ -166,16 +163,19 @@ class sorting :
       return sorted_data, signal_list
 
     @classmethod
-    def  stochastic_momentum_downtrend(cls, bar_df, last_candles = 10 ):
+    def  stochastic_momentum_downtrend(cls, bar_df, last_candles = 10, cross_only= True ):
 
       sort_index, signal_list = [] , []
       for index, ohlc in enumerate(bar_df[sorting.values]):
+          
         observe = ohlc[-last_candles:]
+          
         volatile_adx = (observe['Average-Directional-Index'] > 18) & (observe['Average-Directional-Index'] < 25)
         mask_downtrend_crossover  = observe['crossover_smi'] == -1
         downtrend_heikin_ashi  = observe['Heikin-Ashi-Status'] == 'Red'
-
-        find    = volatile_adx & mask_downtrend_crossover & downtrend_heikin_ashi
+          
+        if cross_only:   find   =                mask_downtrend_crossover 
+        else :          find   = volatile_adx & mask_downtrend_crossover & downtrend_heikin_ashi
         matches = observe[find]
         if  len(matches) > 0 :
               sort_index.append(index)
@@ -193,7 +193,6 @@ class sorting :
       sort_index, signal_list, comments = [] , [] , []
       for index, ohlc in enumerate(bar_df[sorting.values]):
 
-          last_candles = 3
           observe = ohlc[-last_candles:]
 
           # Filter based on Average Directional Index (ADX)
