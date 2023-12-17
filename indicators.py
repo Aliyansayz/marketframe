@@ -1,21 +1,154 @@
-class ema_indicator:
+class indicator_store:
 
-    def __init__(self, data_list = None  ):
+  def  shift(self, array , place):
 
-        self.data_list = data_list
+        array   =  np.array(array, dtype= np.float32)
+        shifted = np.roll(array, place)
+        shifted[0:place]  = np.nan
+        shifted[np.isnan(shifted)] = np.nanmean(shifted)
 
+        return shifted
 
-    def ema (self, array, period ):
+  def  smoothed(self, array, period , alpha = None):
 
         ema = np.empty_like(array)
         ema = np.full( ema.shape , np.nan)
+        ema[0] = np.mean(array[0] , dtype=np.float64)
+        if alpha == None:
+          alpha = 1 / ( period )
+
+        for i in range(1 , len(array) ):
+              ema[i] =  array[i] * alpha +  ( ema[i-1]  * (1-alpha) )
+        try: ema =  np.nan_to_num(ema , nan=0)
+        except: pass
+        
+        return ema
+
+  def ema (self, array, period ):
+
+        ema = np.empty_like(array)
+        ema = np.full( ema.shape  , np.nan)
         ema[0] = np.mean(array[0] , dtype=np.float64)
         alpha  = 2 / (period + 1)
         # Calculate the EMA for each window of 14 values
         for i in range(1 , len(array) ):
               ema[i] = np.array( (array[i] * alpha +  ema[i-1]  * (1-alpha) ) , dtype=np.float16 )
+        try: ema =  np.nan_to_num(ema , nan=0)
+        except: pass
 
         return ema
+
+  # def shift(self, array , place):
+
+  #     array =  np.array(array, dtype= np.float64)
+
+  #     shifted = np.roll(array, place)
+  #     shifted[0:place]  = 0.0
+  #     shifted[np.isnan(shifted)] = np.nanmean(shifted)
+  #     return shifted
+
+  def sma(self, array, period):
+
+      weights = np.ones(period) / period
+      arr     =  np.convolve(array, weights, mode='valid')
+
+      window = period - 1
+      sma = np.empty(window + len(arr), dtype=arr.dtype)
+      sma[:window] = np.nan * window
+      sma[window:] = arr
+      sma[np.isnan(sma)] = np.nanmean(arr[:period])
+
+      return sma
+
+    # def sma(self, array, period):
+
+    #   weights = np.ones(period) / period
+    #   arr     =  np.convolve(array, weights, mode='valid')
+
+    #   window = period - 1
+    #   sma = np.empty(window + len(arr), dtype=arr.dtype)
+    #   sma[:window] = np.nan * window
+    #   sma[window:] = arr
+    #   sma[np.isnan(sma)] = np.nanmean(arr[:period])
+
+    #   return sma
+
+  def moving_min (self, array, period ):
+      moving_min = np.empty_like(array)
+      moving_min = np.full( moving_min.shape , np.nan)
+      for i in range(period, len(array)+1 ):
+            moving_min[i-period] = np.min(array[i-period:i]  )
+      try: moving_min =  np.nan_to_num(moving_min , nan=0)
+      except: pass      
+      # moving_min[np.isnan(moving_min)] = np.nanmean(moving_min)
+      return moving_min
+
+  def moving_max (self, array, period ):
+        moving_max = np.empty_like(array)
+        moving_max = np.full( moving_max.shape , np.nan )
+        # moving_max[:period] = np.max(array[:period])  
+        for i in range(period, len(array)+1 ):
+              moving_max[i-period] = np.max(array[i-period:i]  )
+        try: moving_min =  np.nan_to_num(moving_min , nan=0)
+        except: pass     
+        # moving_max[np.isnan(moving_max)] = np.nanmean(moving_max)
+        return moving_max
+
+  # def ema (self, array, period ):
+
+  #       ema = np.empty_like(array)
+  #       ema = np.full( ema.shape , 0.0)
+  #       ema[0] = np.mean(array[0] , dtype=np.float64)
+  #       alpha  = 2 / (period + 1)
+  #       for i in range(1 , len(array) ):
+  #             ema[i] = (array[i] * alpha +  ema[i-1]  * (1-alpha) )
+
+  #       return ema
+
+  # def moving_min (self, array, period ):
+  #     moving_min = np.empty_like(array)
+  #     moving_min = np.full( moving_min.shape , np.nan)
+  #     for i in range(period, len(array)+1 ):
+  #           moving_min[i-1] = np.min(array[i-period:i]  )
+  #     moving_min[np.isnan(moving_min)] = np.nanmean(moving_min)
+  #     return moving_min
+
+  # def moving_max (self, array, period ):
+  #       moving_max = np.empty_like(array)
+  #       moving_max = np.full( moving_max.shape , np.nan)
+  #       for i in range(period, len(array)+1 ):
+  #             moving_max[i-1] = np.max(array[i-period:i]  )
+  #       moving_max[np.isnan(moving_max)] = np.nanmean(moving_max)
+  #       return moving_max
+
+  # def moving_end (self, array, period ):
+  #       moving_end = np.empty_like(array)
+  #       moving_end = np.full( moving_end.shape , np.nan)
+
+  #       for i in range(period, len(array)+1 ):
+  #             moving_end[i-1] = array[i-1:i]
+  #       moving_end[np.isnan(moving_end)] = np.nanmean(moving_end)
+  #       return moving_end
+  # def sma(self, array, period):
+
+  #     weights = np.ones(period) / period
+  #     arr     =  np.convolve(array, weights, mode='valid')
+
+  #     window = period - 1
+  #     sma = np.empty(window + len(arr), dtype=arr.dtype)
+  #     sma[:window] = np.nan * window
+  #     sma[window:] = arr
+  #     sma[np.isnan(sma)] = np.nanmean(arr[:period])
+
+  #     return sma
+
+# _____________________________________________________________________________
+
+class ema_indicator(indicator_store):
+
+    def __init__(self, data_list = None  ):
+
+        self.data_list = data_list
 
 
     def run(self ):
@@ -72,7 +205,6 @@ class ema_indicator:
 
           #  elif short_ema ==  long_ema  :
           #         direction =
-
       return  crossover , direction
 
     # def crossover_direction_lookback(self, bar_list, lookback):
@@ -101,10 +233,10 @@ class ema_indicator:
                     direction = -1
             #this means :    long_ema = short_ema True
             elif array_close[-1]  > array_open[-1]  :
-                  crossover  = direction = 1
+                  crossover , direction = 1 , 1
             elif array_open[-1] > array_close[-1]   :
-                  crossover  = direction = -1
-                  # direction =
+                  crossover, direction = -1 , -1
+
         return  crossover , direction
 
 
@@ -152,30 +284,9 @@ class ema_indicator:
 
         return crossover_direction_list
 
-    def crossover_direction_lookback_archived(self, bar_list, lookback = 10):
 
-       symbols  = 0
-       values   = 1
-
-       crossover_direction_list = [[0]] * len(bar_list[symbols])
-
-       for  symbol , ohlc in enumerate(bar_list[values]):
-
-            crossover_direction = [[0]]  * lookback
-
-            start_index = len(ohlc['Close'])-lookback
-
-            for i in range( (len(ohlc['Close'])-lookback), (len(ohlc['Close'])), 1):
-
-                 crossover, direction =  self.crossover_and_direction_archived(array = ohlc['Close'][:i] )
-                 crossover_direction[ i-start_index ] = [ crossover, direction ]
-
-            crossover_direction_list[symbol] =  crossover_direction
-
-       return crossover_direction_list
 
 # ema_indicator.transform_data_list(bar_list, lookback, crossover_direction_list  )
-
 
 #___________________________________________________________________________________________________
 
@@ -214,7 +325,7 @@ class atr_bands_indicator ( ema_indicator):
         close_shift = self.shift(close , 1)
         high_low, high_close, low_close  = np.array( high - low ,dtype=np.float32) ,\
         np.array(abs(high - close_shift  ),dtype=np.float32 ) , \
-        np.array(abs(low -  close_shift  ) ,dtype=np.float32 )
+        np.array(abs(low -  close_shift  ),dtype=np.float32 )
 
         true_range = np.max(np.hstack( (high_low, high_close, low_close) ).reshape(-1,3),axis=1 )
         # true_range[true_range == 0] = 0.0001
@@ -232,31 +343,7 @@ class atr_bands_indicator ( ema_indicator):
 
         return   lower_band , upper_band
 
-  def  shift(self, array , place):
-
-        array =  np.array(array, dtype= np.float32)
-
-        shifted = np.roll(array, place)
-        shifted[0:place]  = np.nan
-        shifted[np.isnan(shifted)] = np.nanmean(shifted)
-
-        return shifted
-
-  def  smoothed(self, array, period , alpha = None):
-
-        ema = np.empty_like(array)
-        ema = np.full( ema.shape , np.nan)
-        ema[0] = np.mean(array[0] , dtype=np.float16)
-        if alpha == None:
-          alpha = 1 / ( period )
-
-        for i in range(1 , len(array) ):
-              ema[i] = np.array( (array[i] * alpha +  ema[i-1]  * (1-alpha) ) , dtype=np.float32 )
-
-        ema[np.isnan(ema)] = np.nanmean(ema)
-        return ema
-
-
+  
   def  atr_bands_lookback(self,  bar_list,  multiplier = 1.7,  period = 5,  lookback = 10 ):
 
         values   = 1
@@ -279,20 +366,8 @@ class atr_bands_indicator ( ema_indicator):
 
         return atr_bands_list
 
-  def sma(self, array, period):
 
-      weights = np.ones(period) / period
-      arr     =  np.convolve(array, weights, mode='valid')
-
-      window = period - 1
-      sma = np.empty(window + len(arr), dtype=arr.dtype)
-      sma[:window] = np.nan * window
-      sma[window:] = arr
-      sma[np.isnan(sma)] = np.nanmean(arr[:period])
-
-      return sma
-
-
+#___________________________________________________________________________________________________
 
 import numpy as np
 
@@ -302,13 +377,11 @@ import numpy as np
 
 
 # adx = adx_indicator (data_list = bar_list  )
-
-#___________________________________________________________________________________________________
-
 # adx = adx_indicator(bar_list)
 # adx_value_list = adx.run_adx()
 #
 
+# ___________________________________________________________________________________________________
 class adx_indicator( atr_bands_indicator):
 
   def  __init__(self, data_list = None, period= 14  ):
@@ -350,21 +423,14 @@ class adx_indicator( atr_bands_indicator):
       ndm = np.where(lows  > highs , lows , 0.0  )
 
       smoothed_atr  = self.smoothed(true_range , period)
-      smoothed_atr[smoothed_atr==0] = np.nanmean(smoothed_atr)
-      # smoothed_atr[smoothed_atr == 0] = 0.0001
 
       pdi_value =   self.smoothed( pdm , period) / smoothed_atr
       pdi = pdi_value * 100
-      pdi[pdi==0] = np.nanmean(pdi)
-      # pdi[pdi == 0] = 0.0001
 
       ndi_value = self.smoothed( ndm , period) / smoothed_atr
       ndi =  ndi_value * 100
-      ndi[ndi==0] = np.nanmean(ndi)
-      # ndi[ndi == 0] = 0.0001
 
       dx = ( abs(pdi - ndi) ) / ( abs(pdi + ndi) ) * 100
-
       adx =   self.smoothed(dx, period)
 
       return adx
@@ -380,30 +446,9 @@ class adx_indicator( atr_bands_indicator):
 
         return true_range
 
-  def shift(self, array , place):
-
-      array =  np.array(array, dtype= np.float64)
-
-      shifted = np.roll(array, place)
-      shifted[0:place]  = 0.0
-
-      return shifted
-
-  def sma(self, array, period):
-
-      weights = np.ones(period) / period
-      arr     =  np.convolve(array, weights, mode='valid')
-
-      window = period - 1
-      sma = np.empty(window + len(arr), dtype=arr.dtype)
-      sma[:window] = np.nan * window
-      sma[window:] = arr
-      sma[np.isnan(sma)] = np.nanmean(arr[:period])
-
-      return sma
+  
 
   def  adx_lookback(self,   bar_list, period = 8 , lookback = 10):
-
 
       symbols  = 0
       values   = 1
@@ -460,14 +505,9 @@ class heikin_ashi (adx_indicator):
 
   def heikin_ashi_candles (self, open, high, low, close ):
 
-      ha_close =  np.empty(len(close), dtype=np.float32 )
+      ha_low, ha_close =  np.empty(len(close), dtype=np.float32 ), np.empty(len(close), dtype=np.float32 )
+      ha_open, ha_high = np.empty(len(close), dtype=np.float32 ),  np.empty(len(close), dtype=np.float32 )
 
-      ha_high = np.empty(len(close), dtype=np.float32 )
-      ha_low  = np.empty(len(close), dtype=np.float32 )
-      ha_open = np.empty(len(close), dtype=np.float32 )
-
-      # candles =  np.empty(len(close) , dtype='U10')
-      # candles = [[]] *  len(close) , dtype=np.int16
 
       ha_open[0]  = (open[0] + close[0] ) /2
       ha_close[0] = (close[0] + open[0] + high[0] + low[0]) /4
@@ -600,47 +640,15 @@ class bollinger_bands(heikin_ashi):
 
 class stochastic_oscillator(bollinger_bands):
 
-  def sma(self, array, period):
-
-      weights = np.ones(period) / period
-      arr     =  np.convolve(array, weights, mode='valid')
-
-      window = period - 1
-      sma = np.empty(window + len(arr), dtype=arr.dtype)
-      sma[:window] = np.nan * window
-      sma[window:] = arr
-      sma[np.isnan(sma)] = np.nanmean(arr[:period])
-
-      return sma
-
-  def moving_min (self, array, period ):
-      moving_min = np.empty_like(array)
-      moving_min = np.full( moving_min.shape , np.nan)
-      for i in range(period, len(array)+1 ):
-            moving_min[i-1] = np.min(array[i-period:i]  )
-      return moving_min
-
-  def moving_max (self, array, period ):
-        moving_max = np.empty_like(array)
-        moving_max = np.full( moving_max.shape , np.nan)
-        for i in range(period, len(array)+1 ):
-              moving_max[i-1] = np.max(array[i-period:i]  )
-        return moving_max
-
-  def moving_end (self, array, period ):
-        moving_end = np.empty_like(array)
-        moving_end = np.full( moving_end.shape , np.nan)
-        for i in range(period, len(array)+1 ):
-              moving_end[i-1] = array[i-1:i]
-        return moving_end
-
   def  stochastic_oscillator(self, high, low, close, period):
+
+      # calculate %K line
+      # low , high , close  = low.reshape(-1,1) , high.reshape(-1,1) , close.reshape(-1,1)
 
       lowest_low   = self.moving_min(low  , period )
       highest_high = self.moving_max(high , period )
-      close_last =   self.moving_end(close, period )
 
-      k_percent = 100 * (( close_last - lowest_low) / (highest_high - lowest_low))
+      k_percent = 100 * ( (   close  - lowest_low) / (highest_high - lowest_low) )
       # calculate %D line
       d_percent = self.sma( k_percent  , 3)
 
@@ -650,7 +658,6 @@ class stochastic_oscillator(bollinger_bands):
   def  stochastic_oscillator_lookback(self, bar_list, period = 10, lookback = 10):
 
       symbols, values = 0, 1
-
       stochastic_oscillator_list  =  [[]] * len(bar_list[values])
       for index, ohlc in enumerate(bar_list[values]):
 
@@ -668,65 +675,31 @@ class stochastic_oscillator(bollinger_bands):
 
 class stochastic_momentum_index(stochastic_oscillator):
 
-  def ema (self, array, period ):
-
-        ema = np.empty_like(array)
-        ema = np.full( ema.shape , np.nan)
-        ema[0] = np.mean(array[0] , dtype=np.float64)
-        alpha  = 2 / (period + 1)
-        for i in range(1 , len(array) ):
-              ema[i] = (array[i] * alpha +  ema[i-1]  * (1-alpha) ) 
-
-        return ema
-
-  def moving_min (self, array, period ):
-
-      moving_min = np.empty_like(array)
-      moving_min = np.full( moving_min.shape , np.nan)
-      for i in range(period, len(array)+1 ):
-            moving_min[i-1] = np.min(array[i-period:i]  )
-      return moving_min
-
-  def moving_max (self, array, period ):
-
-        moving_max = np.empty_like(array)
-        moving_max = np.full( moving_max.shape , np.nan)
-        for i in range(period, len(array)+1 ):
-              moving_max[i-1] = np.max(array[i-period:i]  )
-        return moving_max
-
-  def moving_end (self, array, period ):
-
-        moving_end = np.empty_like(array)
-        moving_end = np.full( moving_end.shape , np.nan)
-
-        for i in range(period, len(array)+1 ):
-              moving_end[i-1] = array[i-1:i]
-        return moving_end
-
-
+  
   def  stochastic_momentum_index(self, high, low, close, period= 20, ema_period = 5):
 
-      # calculate %K line
-      # low , high , close  = low.reshape(-1,1) , high.reshape(-1,1) , close.reshape(-1,1)
       lengthD = ema_period
       lowest_low   = self.moving_min(low  , period )
-
       highest_high = self.moving_max(high , period )
-      close_last =   self.moving_end(close, period )
+      relative_range   = close - (( highest_high + lowest_low ) / 2 )
+      highest_lowest_range = highest_high -   lowest_low
 
-      lowest_low_relative_range   = close - ( highest_high + lowest_low ) / 2
-      highest_lowest_range = highest_high -   lowest_low_relative_range
-      relative_range = (lowest_low_relative_range - highest_high) / highest_lowest_range
-      # calculate smi with  %D length 
-      smi = 200 * (self.ema(relative_range, lengthD) / self.ema(highest_lowest_range, lengthD))
+      relative_range_smoothed       = self.ema(self.ema(relative_range,ema_period),ema_period)
+      highest_lowest_range_smoothed = self.ema(self.ema(highest_lowest_range,ema_period),ema_period)
 
+
+      smi = [ (relative_range_smoothed[i] / (highest_lowest_range_smoothed[i] / 2)) * 100 if highest_lowest_range_smoothed[i] != 0 else 0.0
+              for i in range(len(relative_range_smoothed)) ]
+
+      # relative_range = (lowest_low - highest_high) / highest_lowest_range
+      # calculate smi with  %D length
+      
       smi_ema = self.ema(smi,  ema_period)
 
       return  smi, smi_ema
 
 
-  def  stochastic_momentum_lookback(self, bar_list, period = 10, lookback = 10, ema_period = 5 ):
+  def  stochastic_momentum_lookback(self, bar_list, period = 20, lookback = 10, ema_period = 5 ):
 
       symbols, values = 0, 1
 
@@ -739,7 +712,7 @@ class stochastic_momentum_index(stochastic_oscillator):
           if lookback :
             smi, smi_ema   =  smi[-lookback:], smi_ema[-lookback:]
 
-          stochastic_momentum = [ [ smi[i], smi_ema[i]] for i in range( len(k_percent) )]
+          stochastic_momentum = [ [ smi[i], smi_ema[i]] for i in range( len(smi) )]
           stochastic_momentum_list[index] = stochastic_momentum
 
       return   stochastic_momentum_list
@@ -749,5 +722,3 @@ class access_indicators( stochastic_momentum_index ):
 
         def __init__(self):
             pass
-
-
