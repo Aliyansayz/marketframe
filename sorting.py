@@ -125,26 +125,6 @@ class sorting :
 
 
     @classmethod
-    def stochastic_momentum_crossover(cls, bar_df ):
-
-        columns, values  = 0, 1 
-        sort_index, signal_list = [] , [] 
-        for index, frame in enumerate(bar_df[sorting.values]):
-          direction = np.where(frame['smi'] > frame['smi_ema'], 1, np.where(frame['smi'] < frame['smi_ema'], -1, 0))
-          frame = append_fields(frame, 'direction_smi', direction, usemask=False)
-          # Add a new column 'crossover'
-          crossover_values = np.where((frame['direction_smi'] == 1) & (np.roll(frame['direction_smi'], 1) == -1), 1, \
-                                      np.where((frame['direction_smi'] == -1) & (np.roll(frame['direction_smi'], 1) == 1), -1, 0)) 
-          frame    = np.lib.recfunctions.append_fields(frame, 'crossover_smi', crossover_values, usemask=False)
-        
-        smi_direction_crossover  = [ 'direction_smi', 'crossover_smi' ]
-        column_names = list(bar_df[columns])
-        column_names.extend(smi_direction_crossover )
-
-        bar_df = [column_names, bar_df[values]]
-        return  bar_df
-
-    @classmethod
     def  stochastic_momentum_uptrend(cls, bar_df, last_candles = 10, cross_only= True  ):
 
       sort_index, signal_list = [] , []
