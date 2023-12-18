@@ -9,10 +9,9 @@ Tells us market prices in real time with technical indicators, crossover status.
 
 # Recommended Predefined Values
 
-* EMA period = 5/20 
-
+* EMA period = 5/20
+  
 * Stochastic Momentum Index= 20, 5, 5 -> period, SMI calculation period, SMI_based_ema
-
 * ADX period = 8-10 ( 4 Hour/1 Hour )
 
 * ATR period = 5 
