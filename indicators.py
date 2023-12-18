@@ -24,20 +24,51 @@ class indicator_store:
         
         return ema
 
-  def ema (self, array, period ):
+  # def ema (self, array, period ):
 
-        ema = np.empty_like(array)
-        ema = np.full( ema.shape  , np.nan)
-        ema[0] = np.mean(array[0] , dtype=np.float64)
-        alpha  = 2 / (period + 1)
-        # Calculate the EMA for each window of 14 values
-        for i in range(1 , len(array) ):
-              ema[i] = np.array( (array[i] * alpha +  ema[i-1]  * (1-alpha) ) , dtype=np.float16 )
-        try: ema =  np.nan_to_num(ema , nan=0)
-        except: pass
+  #       ema = np.empty_like(array)
+  #       ema = np.full( ema.shape  , np.nan)
+  #       ema[0] = np.mean(array[0] , dtype=np.float64)
+  #       alpha  = 2 / (period + 1)
+  #       # Calculate the EMA for each window of 14 values
+  #       for i in range(1 , len(array) ):
+  #             ema[i] = np.array( (array[i] * alpha +  ema[i-1]  * (1-alpha) ) , dtype=np.float16 )
+  #       try: ema =  np.nan_to_num(ema , nan=0)
+  #       except: pass
 
-        return ema
+  #       return ema
 
+  
+  def ema(self, price, period):
+
+        price = np.array(price)
+        alpha = 2 / (period + 1.0)
+        alpha_reverse = 1 - alpha
+        data_length = len(price)
+
+        power_factors = alpha_reverse**(np.arange(data_length+1))
+
+        scale_factors  = 1 / power_factors[:-1]
+        
+        try: initial_offset = price[0] * power_factors[1:]
+        except: raise ValueError(f"Input must be a list   {price} ")  
+
+        weight_factor  = alpha * alpha_reverse**(data_length-1)
+
+        weighted_price_data = price * weight_factor * scale_factors
+        cumulative_sums = weighted_price_data.cumsum()
+        ema_values = initial_offset + cumulative_sums * scale_factors[::-1]
+
+        return ema_values
+
+  # def shift(self, array , place):
+
+  #     array =  np.array(array, dtype= np.float64)
+
+  #     shifted = np.roll(array, place)
+  #     shifted[0:place]  = 0.0
+  #     shifted[np.isnan(shifted)] = np.nanmean(shifted)
+  #     return shifted
 
   def sma(self, array, period):
 
@@ -52,6 +83,18 @@ class indicator_store:
 
       return sma
 
+    # def sma(self, array, period):
+
+    #   weights = np.ones(period) / period
+    #   arr     =  np.convolve(array, weights, mode='valid')
+
+    #   window = period - 1
+    #   sma = np.empty(window + len(arr), dtype=arr.dtype)
+    #   sma[:window] = np.nan * window
+    #   sma[window:] = arr
+    #   sma[np.isnan(sma)] = np.nanmean(arr[:period])
+
+    #   return sma
 
   def moving_min (self, array, period ):
       moving_min = np.empty_like(array)
@@ -74,7 +117,53 @@ class indicator_store:
         # moving_max[np.isnan(moving_max)] = np.nanmean(moving_max)
         return moving_max
 
-  
+  # def ema (self, array, period ):
+
+  #       ema = np.empty_like(array)
+  #       ema = np.full( ema.shape , 0.0)
+  #       ema[0] = np.mean(array[0] , dtype=np.float64)
+  #       alpha  = 2 / (period + 1)
+  #       for i in range(1 , len(array) ):
+  #             ema[i] = (array[i] * alpha +  ema[i-1]  * (1-alpha) )
+
+  #       return ema
+
+  # def moving_min (self, array, period ):
+  #     moving_min = np.empty_like(array)
+  #     moving_min = np.full( moving_min.shape , np.nan)
+  #     for i in range(period, len(array)+1 ):
+  #           moving_min[i-1] = np.min(array[i-period:i]  )
+  #     moving_min[np.isnan(moving_min)] = np.nanmean(moving_min)
+  #     return moving_min
+
+  # def moving_max (self, array, period ):
+  #       moving_max = np.empty_like(array)
+  #       moving_max = np.full( moving_max.shape , np.nan)
+  #       for i in range(period, len(array)+1 ):
+  #             moving_max[i-1] = np.max(array[i-period:i]  )
+  #       moving_max[np.isnan(moving_max)] = np.nanmean(moving_max)
+  #       return moving_max
+
+  # def moving_end (self, array, period ):
+  #       moving_end = np.empty_like(array)
+  #       moving_end = np.full( moving_end.shape , np.nan)
+
+  #       for i in range(period, len(array)+1 ):
+  #             moving_end[i-1] = array[i-1:i]
+  #       moving_end[np.isnan(moving_end)] = np.nanmean(moving_end)
+  #       return moving_end
+  # def sma(self, array, period):
+
+  #     weights = np.ones(period) / period
+  #     arr     =  np.convolve(array, weights, mode='valid')
+
+  #     window = period - 1
+  #     sma = np.empty(window + len(arr), dtype=arr.dtype)
+  #     sma[:window] = np.nan * window
+  #     sma[window:] = arr
+  #     sma[np.isnan(sma)] = np.nanmean(arr[:period])
+
+  #     return sma
 
 # _____________________________________________________________________________
 
@@ -99,7 +188,7 @@ class ema_indicator(indicator_store):
         for  symbol, ohlc in enumerate(self.data_list[values]) :
 
               crossover,  direction     = self.crossover_and_direction( np.array(ohlc['Close'], ohlc['Open']  ) )
-              crossover_direction[symbol] =   [crossover,  direction]
+              crossover_direction[symbol] =   [crossover,  direction] 
 
         crossover_direction_list  = [  self.data_list[symbols] , crossover_direction ]
         return  crossover_direction_list
@@ -622,8 +711,8 @@ class stochastic_momentum_index(stochastic_oscillator):
       relative_range   = close - (( highest_high + lowest_low ) / 2 )
       highest_lowest_range = highest_high -   lowest_low
 
-      relative_range_smoothed       = self.ema(self.ema(relative_range,ema_period),ema_period)
-      highest_lowest_range_smoothed = self.ema(self.ema(highest_lowest_range,ema_period),ema_period)
+      relative_range_smoothed       = self.smoothed(self.smoothed(relative_range,ema_period),ema_period)
+      highest_lowest_range_smoothed = self.smoothed(self.smoothed(highest_lowest_range,ema_period),ema_period)
 
 
       smi = [ (relative_range_smoothed[i] / (highest_lowest_range_smoothed[i] / 2)) * 100 if highest_lowest_range_smoothed[i] != 0 else 0.0
@@ -647,7 +736,7 @@ class stochastic_momentum_index(stochastic_oscillator):
 
           high,  low,   close  =   ohlc['High'],  ohlc['Low'],  ohlc['Close']
           smi, smi_ema = self.stochastic_momentum_index( high, low, close, period, ema_period)
-          direction , crossover_values = self.stochastic_momentum_crossover(smi, smi_ema, lookback = lookback)
+          direction , crossover_values = self.stochastic_momentum_crossover(bar_list, smi, smi_ema, lookback = lookback)
 
           if lookback :
             smi, smi_ema   =  smi[-lookback:], smi_ema[-lookback:]
@@ -661,12 +750,12 @@ class stochastic_momentum_index(stochastic_oscillator):
       
       else : return   stochastic_momentum_list
 
-  def stochastic_momentum_crossover(cls, smi, smi_ema, lookback = 10 ):
+  def stochastic_momentum_crossover(cls, bar_list, smi, smi_ema, lookback = 10 ):
 
         columns, values  = 0, 1 
         
         stochastic_momentum_crossover = [] * len(smi)
-        for index, frame in enumerate(bar_df[values]):
+        for index, frame in enumerate(bar_list[values]):
           direction = np.where(smi > smi_ema, 1, np.where(smi < smi_ema, -1, 0))
 
           # Add a new column 'crossover'
