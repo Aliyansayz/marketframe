@@ -21,7 +21,7 @@ class indicator_store:
               ema[i] =  array[i] * alpha +  ( ema[i-1]  * (1-alpha) )
         try: ema =  np.nan_to_num(ema , nan=0)
         except: pass
-        
+
         return ema
 
   # def ema (self, array, period ):
@@ -38,7 +38,7 @@ class indicator_store:
 
   #       return ema
 
-  
+
   def ema(self, price, period):
 
         price = np.array(price)
@@ -47,11 +47,9 @@ class indicator_store:
         data_length = len(price)
 
         power_factors = alpha_reverse**(np.arange(data_length+1))
+        initial_offset = price[0] * power_factors[1:]
 
         scale_factors  = 1 / power_factors[:-1]
-        
-        try: initial_offset = price[0] * power_factors[1:]
-        except: raise ValueError(f"Input must be a list   {price} ")  
 
         weight_factor  = alpha * alpha_reverse**(data_length-1)
 
@@ -102,21 +100,49 @@ class indicator_store:
       for i in range(period, len(array)+1 ):
             moving_min[i-period] = np.min(array[i-period:i]  )
       try: moving_min =  np.nan_to_num(moving_min , nan=0)
-      except: pass      
+      except: pass
       # moving_min[np.isnan(moving_min)] = np.nanmean(moving_min)
       return moving_min
 
   def moving_max (self, array, period ):
         moving_max = np.empty_like(array)
         moving_max = np.full( moving_max.shape , np.nan )
-        # moving_max[:period] = np.max(array[:period])  
+        # moving_max[:period] = np.max(array[:period])
         for i in range(period, len(array)+1 ):
               moving_max[i-period] = np.max(array[i-period:i]  )
         try: moving_min =  np.nan_to_num(moving_min , nan=0)
-        except: pass     
+        except: pass
         # moving_max[np.isnan(moving_max)] = np.nanmean(moving_max)
         return moving_max
 
+  def direction_crossover_signal_line(self, array_close, array_open, signal, signal_ema ):
+        # ema_period     =  [ 5 , 20 ]
+        signal_now      = signal[-1]
+        signal_ema_now  = signal_ema[-1]
+
+        prev_signal =   signal[:-1]
+        prev_signal_ema =   signal_ema[:-1]
+        crossover , direction  = 0 , 0
+
+        if prev_signal < prev_signal_ema and signal_now > signal_ema_now :
+              crossover , direction  = 1 , 1
+
+        elif prev_signal_ema > prev_signal and signal_now < signal_ema_now :
+              crossover , direction  = -1 , -1
+
+        else:
+            if   signal_now > signal_ema_now :
+                      direction = 1
+
+            elif signal_now < signal_ema_now  :
+                    direction = -1
+            #this means :    long_ema = short_ema True
+            elif array_close[-1]  > array_open[-1]  :
+                  crossover , direction = 1 , 1
+            elif array_open[-1] > array_close[-1]   :
+                  crossover, direction = -1 , -1
+
+        return  direction, crossover 
   # def ema (self, array, period ):
 
   #       ema = np.empty_like(array)
@@ -188,7 +214,7 @@ class ema_indicator(indicator_store):
         for  symbol, ohlc in enumerate(self.data_list[values]) :
 
               crossover,  direction     = self.crossover_and_direction( np.array(ohlc['Close'], ohlc['Open']  ) )
-              crossover_direction[symbol] =   [crossover,  direction] 
+              crossover_direction[symbol] =   [crossover,  direction]
 
         crossover_direction_list  = [  self.data_list[symbols] , crossover_direction ]
         return  crossover_direction_list
@@ -368,7 +394,7 @@ class atr_bands_indicator ( ema_indicator):
 
         return   lower_band , upper_band
 
-  
+
   def  atr_bands_lookback(self,  bar_list,  multiplier = 1.7,  period = 5,  lookback = 10 ):
 
         values   = 1
@@ -473,7 +499,7 @@ class adx_indicator( atr_bands_indicator):
 
         return true_range
 
-  
+
 
   def  adx_lookback(self,   bar_list, period = 8 , lookback = 10):
 
@@ -702,7 +728,7 @@ class stochastic_oscillator(bollinger_bands):
 
 class stochastic_momentum_index(stochastic_oscillator):
 
-  
+
   def  stochastic_momentum_index(self, high, low, close, period= 20, ema_period = 5):
 
       lengthD = ema_period
@@ -720,7 +746,7 @@ class stochastic_momentum_index(stochastic_oscillator):
 
       # relative_range = (lowest_low - highest_high) / highest_lowest_range
       # calculate smi with  %D length
-      
+
       smi_ema = self.ema(smi,  ema_period)
 
       return  smi, smi_ema
@@ -729,45 +755,38 @@ class stochastic_momentum_index(stochastic_oscillator):
   def  stochastic_momentum_lookback(self, bar_list, period = 20, lookback = 10, ema_period = 5, crossover_direction= False ):
 
       symbols, values = 0, 1
+      if not lookback:  lookback = len(close)
+      start_index = len(close)-lookback
+      crossover_direction  =  [[]] * lookback
 
       stochastic_momentum_list  =  [[]] * len(bar_list[values])
-      stochastic_momentum_crossover_list  = [[]] * len(bar_list[values])
+      smi_direction_crossover_list  = [[]] * len(bar_list[values])
+      
       for index, ohlc in enumerate(bar_list[values]):
 
-          high,  low,   close  =   ohlc['High'],  ohlc['Low'],  ohlc['Close']
+          open, high,  low,   close  =   ohlc['Open'], ohlc['High'],  ohlc['Low'],  ohlc['Close']
           smi, smi_ema = self.stochastic_momentum_index( high, low, close, period, ema_period)
-          direction , crossover_values = self.stochastic_momentum_crossover(bar_list, smi, smi_ema, lookback = lookback)
+          
+            for i in range( start_index, (len(smi)), 1 ):
+              direction,  crossover  =  self.direction_crossover_signal_line( close[:i], open[:i], smi[:i], smi_ema[:i] )
+              crossover_direction[i]  = [ direction , crossover ]
 
           if lookback :
             smi, smi_ema   =  smi[-lookback:], smi_ema[-lookback:]
-            
+
           stochastic_momentum = [ [ smi[i], smi_ema[i]] for i in range( len(smi) )]
           stochastic_momentum_list[index] = stochastic_momentum
-          stochastic_momentum_crossover = [ [ direction[i], crossover_values[i]] for i in range( len(direction) )]
-          stochastic_momentum_crossover_list[index] = stochastic_momentum_crossover
-      
-      if  crossover_direction : return stochastic_momentum_crossover_list
-      
+          # stochastic_momentum_direction_crossover = [ [ direction_smi[i], crossover_smi[i]] for i in range( len(direction_smi) )]
+          smi_direction_crossover_list[index] = crossover_direction
+
+      if  crossover_direction : return smi_direction_crossover_list
+
       else : return   stochastic_momentum_list
 
-  def stochastic_momentum_crossover(cls, bar_list, smi, smi_ema, lookback = 10 ):
 
-        columns, values  = 0, 1 
-        
-        stochastic_momentum_crossover = [] * len(smi)
-        for index, frame in enumerate(bar_list[values]):
-          direction = np.where(smi > smi_ema, 1, np.where(smi < smi_ema, -1, 0))
 
-          # Add a new column 'crossover'
-          crossover_values = np.where((direction == 1) & (np.roll(direction, 1) == -1), 1, \
-                                      np.where((direction == -1) & (np.roll(direction, 1) == 1), -1, 0)) 
-          if lookback :  direction, crossover_values =  direction[-lookback:], crossover_values[-lookback:] 
-        
-        return  direction , crossover_values
 
 class access_indicators( stochastic_momentum_index ):
 
         def __init__(self):
             pass
-
-
