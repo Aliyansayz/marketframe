@@ -8,7 +8,7 @@ class sorting :
     @classmethod
     def get_signal_data(cls, matches, order_type):
 
-      symbol = matches['symbol'][0]
+      symbol = matches['symbol'][-1]
 
       if order_type == 1 :
          order       = 'buy'
@@ -23,23 +23,40 @@ class sorting :
       time  = matches['index'][0]
       return  symbol, order, take_profit, stop_loss, time
 
+    @classmethod
+    def get_signal_data_crossover(cls, matches, order_type):
+
+      symbol = matches['symbol'][-1]
+
+      if order_type == 1 :
+         order       = 'buy'
+         stop_loss   =  matches['atr_lower'][-1]
+         take_profit =  matches['atr_upper'][-1]
+
+      elif order_type == -1 :
+         order       = 'sell'
+         stop_loss   =  matches['atr_upper'][-1]
+         take_profit =  matches['atr_lower'][-1]
+
+      time  = matches['index'][-1]
+      return  symbol, order, take_profit, stop_loss, time
 
     @classmethod
     def sort_uptrend_breakout(cls, bar_df, last_candles = 10,  chart_type = None ):
 
       sort_index, signal_list  =  [], []
       for index, ohlc in enumerate(bar_df[sorting.values]):
-          
+
           observe = ohlc[-last_candles:]
 
           volatile_adx = (observe['Average-Directional-Index'] > 18) & (observe['Average-Directional-Index'] < 25)
-        
+
           uptrend_bb_band     = observe[(observe['High'] > observe['bb_upper']) | (observe['Close'] > observe['bb_upper']) ]
           uptrend_heikin_ashi = observe['Heikin-Ashi-Status'] == 'Green'
 
-          return  [ len(volatile_adx) , len(uptrend_bb_band) ,  ] , len(uptrend_heikin_ashi)
+          # return  [ len(volatile_adx) , len(uptrend_bb_band) ,  ] , len(uptrend_heikin_ashi)
 
-          find    = volatile_adx and uptrend_bb_band and uptrend_heikin_ashi 
+          find    = volatile_adx and uptrend_bb_band and uptrend_heikin_ashi
 
           matches = observe[find]
           if  len(matches) > 0 :
@@ -59,7 +76,7 @@ class sorting :
       sort_index, signal_list  =  [], []
 
       for index, ohlc in enumerate(bar_df[sorting.values]):
-          
+
           observe = ohlc[-last_candles:]
 
           volatile_adx = (observe['Average-Directional-Index'] > 18) &  (observe['Average-Directional-Index'] < 25)
@@ -85,7 +102,7 @@ class sorting :
 
       sort_index, signal_list  =  [], []
       for index, ohlc in enumerate(bar_df[sorting.values]):
-        
+
           observe = ohlc[-last_candles:]
 
           volatile_adx = (observe['Average-Directional-Index'] > 15) &  (observe['Average-Directional-Index'] < 25)
@@ -134,17 +151,17 @@ class sorting :
       for index, ohlc in enumerate(bar_df[sorting.values]):
 
         observe = ohlc[-last_candles:]
-          
+
         volatile_adx = (observe['Average-Directional-Index'] > 18) & (observe['Average-Directional-Index'] < 25)
         mask_downtrend_crossover = observe['direction_smi']   ==  -1
         downtrend_heikin_ashi    = observe['Heikin-Ashi-Status'] == 'Red'
-        
+
         mask_uptrend_crossover  = observe['direction_smi']   == 1
         uptrend_heikin_ashi  = observe['Heikin-Ashi-Status'] == 'Green'
 
-          
+
         if cross_only:  find_s, find_b   =    mask_downtrend_crossover ,  mask_uptrend_crossover
-        else :          
+        else :
           find_s, find_b   =   volatile_adx & mask_downtrend_crossover & downtrend_heikin_ashi , volatile_adx & mask_uptrend_crossover & uptrend_heikin_ashi
         matches_s = observe[find_s]
         matches_b = observe[find_b]
@@ -172,30 +189,30 @@ class sorting :
       for index, ohlc in enumerate(bar_df[sorting.values]):
 
         observe = ohlc[-last_candles:]
-          
+
         volatile_adx = (observe['Average-Directional-Index'] > 18) & (observe['Average-Directional-Index'] < 25)
         mask_downtrend_crossover = observe['Direction']   ==  -1
         downtrend_heikin_ashi    = observe['Heikin-Ashi-Status'] == 'Red'
-        
+
         mask_uptrend_crossover  = observe['Direction']   == 1
         uptrend_heikin_ashi  = observe['Heikin-Ashi-Status'] == 'Green'
 
-          
+
         if cross_only:  find_s, find_b   =    mask_downtrend_crossover ,  mask_uptrend_crossover
-        else :          
+        else :
           find_s, find_b   =   volatile_adx & mask_downtrend_crossover & downtrend_heikin_ashi , volatile_adx & mask_uptrend_crossover & uptrend_heikin_ashi
         matches_s = observe[find_s]
         matches_b = observe[find_b]
 
         if  len(matches_s) > 0 :
               sort_index.append(index)
-              symbol, order, take_profit, stop_loss, time  =  cls.get_signal_data( matches_s, order_type = -1 )
+              symbol, order, take_profit, stop_loss, time  =  cls.get_signal_data_crossover( matches_s, order_type = -1 )
               sell_signal  =  [symbol, order, take_profit, stop_loss,  time, chart_type]
               sell_signal_list.append(sell_signal)
 
         if  len(matches_b) > 0 :
               sort_index.append(index)
-              symbol, order, take_profit, stop_loss, time  =  cls.get_signal_data( matches_b, order_type = 1 )
+              symbol, order, take_profit, stop_loss, time  =  cls.get_signal_data_crossover( matches_b, order_type = 1 )
               buy_signal   =  [symbol, order, take_profit, stop_loss, time, chart_type]
               buy_signal_list.append(buy_signal)
 
@@ -210,18 +227,18 @@ class sorting :
       for index, ohlc in enumerate(bar_df[sorting.values]):
 
         observe = ohlc[-last_candles:]
-          
-        volatile_adx = (observe['Average-Directional-Index'] > 18) & (observe['Average-Directional-Index'] < 25)
-        mask_uptrend_crossover  = observe['crossover_smi']   == 1
+
+        volatile_adx = (observe['Average-Directional-Index'] > 18) | (observe['Average-Directional-Index'] < 25)
+        mask_uptrend_crossover  = observe['crossover_smi']   == 1.0
         uptrend_heikin_ashi  = observe['Heikin-Ashi-Status'] == 'Green'
-          
-        if cross_only:  find   =                mask_uptrend_crossover 
+
+        if cross_only:  find   =                mask_uptrend_crossover
         else :          find   = volatile_adx & mask_uptrend_crossover & uptrend_heikin_ashi
         matches = observe[find]
         if  len(matches) > 0 :
               sort_index.append(index)
-              symbol, order, stop_loss, take_profit, time  =  cls.get_signal_data( matches, order_type = 1 )
-              signal  =  [symbol, order, stop_loss, take_profit, time, chart_type]
+              symbol, order, take_profit, stop_loss, time  =  cls.get_signal_data_crossover( matches, order_type = 1 )
+              signal  =  [symbol, order, take_profit, stop_loss, time, chart_type]
               signal_list.append(signal)
 
       sorted_data = [ bar_df[sorting.values][i] for i in range(len(bar_df[sorting.values])) if i in sort_index ]
@@ -233,20 +250,20 @@ class sorting :
 
       sort_index, signal_list = [] , []
       for index, ohlc in enumerate(bar_df[sorting.values]):
-          
+
         observe = ohlc[-last_candles:]
-          
-        volatile_adx = (observe['Average-Directional-Index'] > 18) & (observe['Average-Directional-Index'] < 25)
-        mask_downtrend_crossover  = observe['crossover_smi'] == -1
+
+        volatile_adx = (observe['Average-Directional-Index'] > 18) | (observe['Average-Directional-Index'] < 25)
+        mask_downtrend_crossover  = observe['crossover_smi'] == -1.0
         downtrend_heikin_ashi  = observe['Heikin-Ashi-Status'] == 'Red'
-          
-        if cross_only:  find   =                mask_downtrend_crossover 
+
+        if cross_only:  find   =                mask_downtrend_crossover
         else :          find   = volatile_adx & mask_downtrend_crossover & downtrend_heikin_ashi
         matches = observe[find]
         if  len(matches) > 0 :
               sort_index.append(index)
-              symbol, order, stop_loss, take_profit, time  =  cls.get_signal_data( matches, order_type = -1 )
-              signal  =  [symbol, order, stop_loss, take_profit, time, chart_type]              
+              symbol, order,  take_profit, stop_loss, time  =  cls.get_signal_data_crossover( matches, order_type = -1 )
+              signal  =  [symbol, order,  take_profit, stop_loss, time, chart_type]
               signal_list.append(signal)
 
       sorted_data = [ bar_df[sorting.values][i] for i in range(len(bar_df[sorting.values])) if i in sort_index ]
