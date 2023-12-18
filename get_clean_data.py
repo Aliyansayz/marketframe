@@ -30,7 +30,7 @@ class get_clean_data:
       for index, df in enumerate(bar_list[values]):
           df = df.drop('Adj Close', axis=1)
           df = df.drop('Volume', axis =1 )
-
+          df = df.fillna(df.mean())
           # resampled_df = df.resample(step).ohlc()
           # resampled_df = pd.DataFrame(resampled_data)
           np_df = df.to_records(index=True)
