@@ -19,3 +19,15 @@ Tells us market prices in real time with technical indicators, crossover status.
 
 * ATR multiplier = 1.7 
 * BB Multiplier  = 2.0 
+
+
+
+symbols_forex = [
+    'AUDCAD=X', 'AUDCHF=X', 'AUDJPY=X', 'AUDNZD=X', 'AUDUSD=X',
+    'CADCHF=X','CADJPY=X' ,
+    'CHFJPY=X',
+    'EURAUD=X', 'EURCAD=X', 'EURCHF=X', 'EURGBP=X', 'EURJPY=X', 'EURNZD=X', 'EURUSD=X',
+    'GBPAUD=X', 'GBPCAD=X', 'GBPCHF=X', 'GBPJPY=X', 'GBPUSD=X',  'GBPNZD=X',
+    'NZDCAD=X', 'NZDCHF=X', 'NZDJPY=X', 'NZDUSD=X',
+    'USDCHF=X', 'USDCAD=X', 'USDJPY=X'
+]
