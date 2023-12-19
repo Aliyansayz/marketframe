@@ -12,15 +12,15 @@ class sorting :
 
       if order_type == 1 :
          order       = 'buy'
-         stop_loss   =  matches['atr_lower'][0]
-         take_profit =  matches['atr_upper'][0]
+         stop_loss   =  matches['atr_lower'][-1]
+         take_profit =  matches['atr_upper'][-1]
 
       elif order_type == -1 :
          order       = 'sell'
-         stop_loss   =  matches['atr_upper'][0]
-         take_profit =  matches['atr_lower'][0]
+         stop_loss   =  matches['atr_upper'][-1]
+         take_profit =  matches['atr_lower'][-1]
 
-      time  = matches['index'][0]
+      time  = matches['index'][-1]
       return  symbol, order, take_profit, stop_loss, time
 
     @classmethod
