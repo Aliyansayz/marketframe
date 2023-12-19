@@ -153,10 +153,10 @@ class sorting :
         observe = ohlc[-last_candles:]
 
         volatile_adx = (observe['Average-Directional-Index'] > 18) & (observe['Average-Directional-Index'] < 25)
-        mask_downtrend_crossover = observe['direction_smi']   ==  -1
+        mask_downtrend_crossover = observe['direction_smi']   ==  -1.0
         downtrend_heikin_ashi    = observe['Heikin-Ashi-Status'] == 'Red'
 
-        mask_uptrend_crossover  = observe['direction_smi']   == 1
+        mask_uptrend_crossover  = observe['direction_smi']   == 1.0
         uptrend_heikin_ashi  = observe['Heikin-Ashi-Status'] == 'Green'
 
 
@@ -165,6 +165,9 @@ class sorting :
           find_s, find_b   =   volatile_adx & mask_downtrend_crossover & downtrend_heikin_ashi , volatile_adx & mask_uptrend_crossover & uptrend_heikin_ashi
         matches_s = observe[find_s]
         matches_b = observe[find_b]
+
+        if len(matches_s) > 0 and len(matches_b) > 0 :
+               matches_s , matches_b  =  cls.clean_duplicate(find_s, find_b )
 
         if  len(matches_s) > 0 :
               sort_index.append(index)
@@ -191,11 +194,11 @@ class sorting :
         observe = ohlc[-last_candles:]
 
         volatile_adx = (observe['Average-Directional-Index'] > 18) & (observe['Average-Directional-Index'] < 25)
-        mask_downtrend_crossover = observe['Direction']   ==  -1
+        mask_downtrend_crossover = observe['Direction']   ==  -1.0
         downtrend_heikin_ashi    = observe['Heikin-Ashi-Status'] == 'Red'
 
-        mask_uptrend_crossover  = observe['Direction']   == 1
-        uptrend_heikin_ashi  = observe['Heikin-Ashi-Status'] == 'Green'
+        mask_uptrend_crossover  = observe['Direction']   == 1.0
+        uptrend_heikin_ashi     = observe['Heikin-Ashi-Status'] == 'Green'
 
 
         if cross_only:  find_s, find_b   =    mask_downtrend_crossover ,  mask_uptrend_crossover
@@ -203,7 +206,9 @@ class sorting :
           find_s, find_b   =   volatile_adx & mask_downtrend_crossover & downtrend_heikin_ashi , volatile_adx & mask_uptrend_crossover & uptrend_heikin_ashi
         matches_s = observe[find_s]
         matches_b = observe[find_b]
-
+        if len(matches_s) > 0 and len(matches_b) > 0 :
+               matches_s , matches_b  =  cls.clean_duplicate(find_s, find_b )
+        
         if  len(matches_s) > 0 :
               sort_index.append(index)
               symbol, order, take_profit, stop_loss, time  =  cls.get_signal_data_crossover( matches_s, order_type = -1 )
@@ -269,6 +274,17 @@ class sorting :
       sorted_data = [ bar_df[sorting.values][i] for i in range(len(bar_df[sorting.values])) if i in sort_index ]
 
       return sorted_data, signal_list
+
+    @classmethod
+    def clean_duplicate(cls, find_s, find_b):
+
+          up_index    = np.where(find_b)[0]
+          down_index  = np.where(find_s)[0]
+
+          if up_index[-1] > down_index[-1]:   matches_s, matches_b = [] , data[find_b]
+          elif up_index[-1] < down_index[-1]: matches_s, matches_b =  data[find_s] , []
+
+          return  matches_s, matches_b
 
     @classmethod
     def sort_trend_change_early_exit(cls, bar_df,   last_candles = 10  ):
