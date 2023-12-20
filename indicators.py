@@ -142,7 +142,7 @@ class indicator_store:
             elif array_open[-1] > array_close[-1]   :
                   crossover, direction = -1 , -1
 
-        return  direction, crossover 
+        return  direction, crossover
   # def ema (self, array, period ):
 
   #       ema = np.empty_like(array)
@@ -761,13 +761,13 @@ class stochastic_momentum_index(stochastic_oscillator):
 
       stochastic_momentum_list  =  [[]] * len(bar_list[values])
       smi_direction_crossover_list  = [[]] * len(bar_list[values])
-      
+
       for index, ohlc in enumerate(bar_list[values]):
 
           open, high,  low,   close  =   ohlc['Open'], ohlc['High'],  ohlc['Low'],  ohlc['Close']
           smi, smi_ema = self.stochastic_momentum_index( high, low, close, period, ema_period)
-          
-            for i in range( start_index, (len(smi)), 1 ):
+
+          for i in range( start_index, (len(smi)), 1 ):
               direction,  crossover  =  self.direction_crossover_signal_line( close[:i], open[:i], smi[:i], smi_ema[:i] )
               crossover_direction[i]  = [ direction , crossover ]
 
