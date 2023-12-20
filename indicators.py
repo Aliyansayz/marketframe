@@ -59,14 +59,6 @@ class indicator_store:
 
         return ema_values
 
-  # def shift(self, array , place):
-
-  #     array =  np.array(array, dtype= np.float64)
-
-  #     shifted = np.roll(array, place)
-  #     shifted[0:place]  = 0.0
-  #     shifted[np.isnan(shifted)] = np.nanmean(shifted)
-  #     return shifted
 
   def sma(self, array, period):
 
@@ -81,18 +73,7 @@ class indicator_store:
 
       return sma
 
-    # def sma(self, array, period):
-
-    #   weights = np.ones(period) / period
-    #   arr     =  np.convolve(array, weights, mode='valid')
-
-    #   window = period - 1
-    #   sma = np.empty(window + len(arr), dtype=arr.dtype)
-    #   sma[:window] = np.nan * window
-    #   sma[window:] = arr
-    #   sma[np.isnan(sma)] = np.nanmean(arr[:period])
-
-    #   return sma
+   
 
   def moving_min (self, array, period ):
       moving_min = np.empty_like(array)
@@ -115,81 +96,22 @@ class indicator_store:
         # moving_max[np.isnan(moving_max)] = np.nanmean(moving_max)
         return moving_max
 
-  def direction_crossover_signal_line(self, array_close, array_open, signal, signal_ema ):
-        # ema_period     =  [ 5 , 20 ]
+  def direction_crossover_signal_line(self, signal, signal_ema ):
+       
         signal_now      = signal[-1]
         signal_ema_now  = signal_ema[-1]
 
         prev_signal =   signal[:-1]
         prev_signal_ema =   signal_ema[:-1]
-        crossover , direction  = 0 , 0
 
-        if prev_signal < prev_signal_ema and signal_now > signal_ema_now :
-              crossover , direction  = 1 , 1
 
-        elif prev_signal_ema > prev_signal and signal_now < signal_ema_now :
-              crossover , direction  = -1 , -1
+        direction = np.where(signal - signal_ema > 0, 1, -1)
 
-        else:
-            if   signal_now > signal_ema_now :
-                      direction = 1
-
-            elif signal_now < signal_ema_now  :
-                    direction = -1
-            #this means :    long_ema = short_ema True
-            elif array_close[-1]  > array_open[-1]  :
-                  crossover , direction = 1 , 1
-            elif array_open[-1] > array_close[-1]   :
-                  crossover, direction = -1 , -1
+        crossover = np.diff(direction, prepend=0)
+        crossover = np.where(crossover < 0, -1, np.where(crossover > 0, 1, 0))
 
         return  direction, crossover
-  # def ema (self, array, period ):
-
-  #       ema = np.empty_like(array)
-  #       ema = np.full( ema.shape , 0.0)
-  #       ema[0] = np.mean(array[0] , dtype=np.float64)
-  #       alpha  = 2 / (period + 1)
-  #       for i in range(1 , len(array) ):
-  #             ema[i] = (array[i] * alpha +  ema[i-1]  * (1-alpha) )
-
-  #       return ema
-
-  # def moving_min (self, array, period ):
-  #     moving_min = np.empty_like(array)
-  #     moving_min = np.full( moving_min.shape , np.nan)
-  #     for i in range(period, len(array)+1 ):
-  #           moving_min[i-1] = np.min(array[i-period:i]  )
-  #     moving_min[np.isnan(moving_min)] = np.nanmean(moving_min)
-  #     return moving_min
-
-  # def moving_max (self, array, period ):
-  #       moving_max = np.empty_like(array)
-  #       moving_max = np.full( moving_max.shape , np.nan)
-  #       for i in range(period, len(array)+1 ):
-  #             moving_max[i-1] = np.max(array[i-period:i]  )
-  #       moving_max[np.isnan(moving_max)] = np.nanmean(moving_max)
-  #       return moving_max
-
-  # def moving_end (self, array, period ):
-  #       moving_end = np.empty_like(array)
-  #       moving_end = np.full( moving_end.shape , np.nan)
-
-  #       for i in range(period, len(array)+1 ):
-  #             moving_end[i-1] = array[i-1:i]
-  #       moving_end[np.isnan(moving_end)] = np.nanmean(moving_end)
-  #       return moving_end
-  # def sma(self, array, period):
-
-  #     weights = np.ones(period) / period
-  #     arr     =  np.convolve(array, weights, mode='valid')
-
-  #     window = period - 1
-  #     sma = np.empty(window + len(arr), dtype=arr.dtype)
-  #     sma[:window] = np.nan * window
-  #     sma[window:] = arr
-  #     sma[np.isnan(sma)] = np.nanmean(arr[:period])
-
-  #     return sma
+ 
 
 # _____________________________________________________________________________
 
@@ -473,7 +395,7 @@ class adx_indicator( atr_bands_indicator):
       highs , lows =   high - self.shift(high , 1 ) ,  self.shift(low , 1) - low
 
       pdm = np.where(highs > lows  , highs , 0.0 )
-      ndm = np.where(lows  > highs , lows , 0.0  )
+      ndm = np.where(lows  > highs , lows  , 0.0 )
 
       smoothed_atr  = self.smoothed(true_range , period)
 
@@ -755,28 +677,25 @@ class stochastic_momentum_index(stochastic_oscillator):
   def  stochastic_momentum_lookback(self, bar_list, period = 20, lookback = 10, ema_period = 5, crossover_direction= False ):
 
       symbols, values = 0, 1
-      if not lookback:  lookback = len(close)
-      start_index = len(close)-lookback
-      crossover_direction  =  [[]] * lookback
-
+      
       stochastic_momentum_list  =  [[]] * len(bar_list[values])
       smi_direction_crossover_list  = [[]] * len(bar_list[values])
+      crossover_direction  =  [[]] * lookback
 
       for index, ohlc in enumerate(bar_list[values]):
 
           open, high,  low,   close  =   ohlc['Open'], ohlc['High'],  ohlc['Low'],  ohlc['Close']
           smi, smi_ema = self.stochastic_momentum_index( high, low, close, period, ema_period)
-
-          for i in range( start_index, (len(smi)), 1 ):
-              direction,  crossover  =  self.direction_crossover_signal_line( close[:i], open[:i], smi[:i], smi_ema[:i] )
-              crossover_direction[i]  = [ direction , crossover ]
-
+          
           if lookback :
             smi, smi_ema   =  smi[-lookback:], smi_ema[-lookback:]
+
+          direction,  crossover  =  self.direction_crossover_signal_line( smi , smi_ema )
 
           stochastic_momentum = [ [ smi[i], smi_ema[i]] for i in range( len(smi) )]
           stochastic_momentum_list[index] = stochastic_momentum
           # stochastic_momentum_direction_crossover = [ [ direction_smi[i], crossover_smi[i]] for i in range( len(direction_smi) )]
+          crossover_direction  = [ [ direction[i], crossover[i]] for i in range( len(smi) )]
           smi_direction_crossover_list[index] = crossover_direction
 
       if  crossover_direction : return smi_direction_crossover_list
