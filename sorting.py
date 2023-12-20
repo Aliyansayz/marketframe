@@ -152,7 +152,7 @@ class sorting :
 
         observe = ohlc[-last_candles:]
 
-        volatile_adx = (observe['Average-Directional-Index'] > 18) & (observe['Average-Directional-Index'] < 25)
+        volatile_adx = (observe['Average-Directional-Index'] > 18) |  (observe['Average-Directional-Index'] < 25)
         mask_downtrend_crossover = observe['direction_smi']   ==  -1.0
         downtrend_heikin_ashi    = observe['Heikin-Ashi-Status'] == 'Red'
 
@@ -167,7 +167,7 @@ class sorting :
         matches_b = observe[find_b]
 
         if len(matches_s) > 0 and len(matches_b) > 0 :
-               matches_s , matches_b  =  cls.clean_duplicate(find_s, find_b )
+               matches_s , matches_b  =  cls.clean_duplicate(find_s, find_b, observe )
 
         if  len(matches_s) > 0 :
               sort_index.append(index)
@@ -207,8 +207,8 @@ class sorting :
         matches_s = observe[find_s]
         matches_b = observe[find_b]
         if len(matches_s) > 0 and len(matches_b) > 0 :
-               matches_s , matches_b  =  cls.clean_duplicate(find_s, find_b )
-        
+               matches_s , matches_b  =  cls.clean_duplicate(find_s, find_b, observe )
+
         if  len(matches_s) > 0 :
               sort_index.append(index)
               symbol, order, take_profit, stop_loss, time  =  cls.get_signal_data_crossover( matches_s, order_type = -1 )
@@ -276,13 +276,13 @@ class sorting :
       return sorted_data, signal_list
 
     @classmethod
-    def clean_duplicate(cls, find_s, find_b):
+    def clean_duplicate(cls, find_s, find_b, observe ):
 
           up_index    = np.where(find_b)[0]
           down_index  = np.where(find_s)[0]
 
-          if up_index[-1] > down_index[-1]:   matches_s, matches_b = [] , data[find_b]
-          elif up_index[-1] < down_index[-1]: matches_s, matches_b =  data[find_s] , []
+          if up_index[-1] > down_index[-1]:   matches_s, matches_b =  [] , observe[find_b]
+          elif up_index[-1] < down_index[-1]: matches_s, matches_b =  observe[find_s] , []
 
           return  matches_s, matches_b
 
