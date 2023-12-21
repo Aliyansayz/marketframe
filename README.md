@@ -54,7 +54,15 @@ bar_df = indicators_lookback_mode.transform_data_list( refine_list = resample_li
                   atr_period = 5, adx_period = 8 , lookback = 14, ema_period = [5, 20], ha_ohlc = True )
 
 ## Sorting Pairs For Buy & Sell Trade 
+
+#(Strategy : adx_stochastic_momentum)
+sorted_data, sell_signal_list, buy_signal_list = sorting.adx_stochastic_momentum(bar_df, last_candles = 30, cross_only= True , chart_type = None )
+
+#(Strategy : adx_crossover_ema)
 sorted_data,  sell_signal_list, buy_signal_list  = sorting.adx_crossover_ema(bar_df, last_candles = 10, cross_only= False , chart_type = None )
+
+
+
 
 ## Signal 
 print(sell_signal_list)
