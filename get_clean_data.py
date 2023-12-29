@@ -1,7 +1,7 @@
 class get_clean_data:
 
   @classmethod
-  def get_data_np_df(cls, symbols , interval = None , period = None, step = '3H', format='pkt' ):
+  def get_data_np_df(cls, symbols , interval = None , period = None ):
       # symbols = ['BTC-USD' , 'ETH-USD' ]
       if interval == None and period == None :
         interval = '5m'
