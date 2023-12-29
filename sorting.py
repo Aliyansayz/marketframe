@@ -152,7 +152,7 @@ class sorting :
 
         observe = ohlc[-last_candles:]
 
-        volatile_adx = (observe['Average-Directional-Index'] > 18) |  (observe['Average-Directional-Index'] < 25)
+        volatile_adx = (observe['Average-Directional-Index'] > 18) &  (observe['Average-Directional-Index'] < 25)
         mask_downtrend_crossover = observe['direction_smi']   ==  -1.0
         downtrend_heikin_ashi    = observe['Heikin-Ashi-Status'] == 'Red'
 
