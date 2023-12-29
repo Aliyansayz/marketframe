@@ -19,11 +19,7 @@ class get_clean_data:
       except: 
           bar_list  = [ symbols , data ]
         
-
-      
-
       bar_list = cls.refined_df(bar_list)
-
 
       return bar_list
 
