@@ -34,7 +34,7 @@ class  indicators_lookback_mode( access_indicators ):
     adx_value_list = indicator.adx_lookback( bar_list = refine_list,   period = adx_period , lookback = lookback)
 
 
-    bollinger_bands_list = indicator.get_bollinger_bands( bar_list, lookback = lookback )
+    bollinger_bands_list = indicator.get_bollinger_bands( bar_list= refine_list, lookback = lookback )
 
     # lookback = 10
     dt   = np.dtype([ ('index', 'datetime64[h]'),  ('symbol', 'U20'), ('Open', float ), ('High', float ), ('Low', float),  ('Close', float ),  ('Heikin-Ashi-Status', 'U10'),  ('Direction', float), ('Average-Directional-Index', float), ('Crossover', float),   \
