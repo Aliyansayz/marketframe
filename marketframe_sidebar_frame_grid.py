@@ -1,96 +1,169 @@
 import customtkinter as ctk
-from marketframe_ui import forex_ui , forex_ui_groups
+from marketframe_ui import  forex_ui_groups , crypto_ui_groups
 
 
 # ctk.set_appearance_mode("System")  # Modes: "System" (standard), "Dark", "Light"
-ctk.set_default_color_theme("blue")
-# Create the main window
 
 
-root = ctk.CTk()
-root.grid_columnconfigure(1, weight=1)
-root.grid_columnconfigure((2, 3), weight=0)
-root.grid_rowconfigure((0, 1, 2), weight=1)
-
-root.geometry(f"{1100}x{580}")
+# kashmir fg_color=("#614385" , "#516395") ugly blue sky
 
 
-# Create the sidebar
-sidebar = ctk.CTkFrame(root, width=140, corner_radius=0)
-sidebar.grid(row=0, column=0, rowspan=4, sticky="nsew")
-sidebar.grid_rowconfigure(4, weight=1)
 
-class asset_frame:
+class app_frame_store:
+
     @classmethod
-    def create_asset_frame(cls, asset, command =None):
+    def sidebar(cls, root):
+        global  sidebar
+        side_button_colors = [["#eacda3 ", "#d6ae7b"], ["#aa076b", "#61045f"]]  # wood, violet like
+        # Create the sidebar
+        sidebar = ctk.CTkFrame(root, width=140, corner_radius=0, fg_color="black")
+        sidebar.grid(row=0, column=0, rowspan=4, sticky="nsew")
+        sidebar.grid_rowconfigure(4, weight=1)
+        cls.sidebar_button(sidebar)
+
+    @classmethod
+    def sidebar_button(cls, root):
+        side_button_colors = ["#6B5B95", "#45B8AC", "#DD4124", "#009B77",
+                              "#45B8AC"]  # Ultra Violet, Mimosa #EFC050,Tangerine Tango,  Emerald
+        side_button_text_colors = ["#39FF14", "#fe4005", "#04d9ff", "#FFDF00", "#6B5B95"]
+
+        asset_type = ['FOREX', "CRYPTO", 'INDICES', 'STOCKS COMMODITIES']
+
+        sidebar_buttons = []
+        for i, asset in enumerate(asset_type):
+            button = ctk.CTkButton(root, text=asset, width=120, height=35, font=ctk.CTkFont(size=15, weight="normal"),
+                                   text_color="#39FF14"  # "#39FF14"
+                                   , fg_color="black", hover_color="#AFA274", border_color="white")
+
+            button.configure(hover_color="#1D5D99")#1D5D99")  # fg_color="lightblue", hover_color="lightgreen" )
+            button.grid(row=i, column=0, padx=20, pady=(0, 10), sticky="nsew")
+            sidebar_buttons.append(button)
+
+        for i, button in enumerate(sidebar_buttons):
+            asset = asset_type[i]
+            button.bind("<Button-1>", lambda e, asset=asset: cls.switch_frame(asset))
+
+    @classmethod
+    def change_appearance_mode_event(cls, new_appearance_mode: str):
+        ctk.set_appearance_mode(new_appearance_mode)
+
+    @classmethod
+    def appearance_mode_button(cls, root):
+        appearance_mode_label = ctk.CTkLabel(root, text="Appearance Mode:", anchor="w", )
+        appearance_mode_label.grid(row=5, column=0, rowspan=4, padx=20, pady=(10, 0))
+        appearance_mode_optionmenu = ctk.CTkOptionMenu(root, values=["Light", "Dark", "System"],
+                                                       command=cls.change_appearance_mode_event)
+        appearance_mode_optionmenu.grid(row=7, column=0, padx=20, pady=(10, 10))
+        appearance_mode_optionmenu.set("Dark")
+
+
+class create_asset_frame(app_frame_store):
+
+    @classmethod
+    def create_frame(cls, root):
+        global frame
+
+        frame = ctk.CTkScrollableFrame(root)
+        frame.grid_columnconfigure(1, weight=0)
+        frame.grid_columnconfigure((2, 3), weight=0)
+        frame.grid_rowconfigure((0, 1, 2, 3, 4, 5), weight=0)
+
+        frame.grid(row=0, column=1, rowspan=4, padx=(7, 7), pady=(5, 5), sticky="nsew")
+
+        return frame
+
+    @classmethod
+    def asset_frame(cls, frame, asset):
 
             # frame = ctk.CTkFrame(root)
-
-            frame = ctk.CTkScrollableFrame(root)
-
-            frame.grid_columnconfigure(1, weight=0)
-            frame.grid_columnconfigure((2, 3), weight=0)
-            frame.grid_rowconfigure((0, 1, 2, 3, 4), weight=0)
-
-            frame.grid( row=0 , column=1, rowspan=4, padx=(7, 7), pady=(5, 5), sticky="nsew")
             frame.title = asset
-            # columnspan=2
-            # Customize the frame's content based on asset_type
-            # (Add labels, buttons, data visualizations, etc.)
-            # label = ctk.CTkLabel(frame, text=f"Content for {asset}")
-            # label.grid(row=1, column=0, pady=20)
 
-            if asset=="Forex":
+
+            if asset=="FOREX":
                 forex_ui_groups.forex_ui(frame)
 
-            # button = ctk.CTkButton(frame, text=f"{asset}", command=command)
-            # button.grid(row=2, column=0, padx=20, pady=10)
 
-            return frame
+            elif asset=="CRYPTO":
+                crypto_ui_groups.crypto_ui(frame)
 
 
-asset_type = ['Forex', 'Indices', 'Stocks', 'Metals']
-asset_frame = asset_frame.create_asset_frame(f"{asset_type[0]}", None )
+
+
+    @classmethod
+    def switch_frame(cls, asset):
+
+        cls.asset_frame(frame, asset)
+
+
+
+class run_app(create_asset_frame):
+
+    @classmethod
+    def run_app(cls):
+
+        ctk.set_default_color_theme("blue")
+        # Create the main window
+        root = ctk.CTk()
+        root.grid_columnconfigure(1, weight=1)
+        root.grid_columnconfigure((2, 3), weight=0)
+        root.grid_rowconfigure((0, 1, 2), weight=1)
+        root.geometry(f"{1100}x{580}")
+
+        cls.sidebar(root)
+        cls.appearance_mode_button( sidebar)
+        frame = cls.create_frame(root)
+
+        asset_type = ['FOREX', "CRYPTO", 'INDICES', 'STOCKS COMMODITIES']
+
+
+
+        # cls.asset_frame(f"{asset_type[0]}", frame)
+
+        root.mainloop()
+
+
 
 
 def change_appearance_mode_event(new_appearance_mode: str):
     ctk.set_appearance_mode(new_appearance_mode)
 
+run_app.run_app()
 
-appearance_mode_label = ctk.CTkLabel(sidebar, text="Appearance Mode:", anchor="w")
-appearance_mode_label.grid(row=5, column=0, rowspan=4, padx=20, pady=(10, 0))
-appearance_mode_optionmenu = ctk.CTkOptionMenu(sidebar, values=["Light", "Dark", "System"],
-                            command=change_appearance_mode_event)
-appearance_mode_optionmenu.grid(row=6, column=0, padx=20, pady=(10, 10))
-appearance_mode_optionmenu.set("Dark")
+# appearance_mode_label = ctk.CTkLabel(sidebar, text="Appearance Mode:", anchor="w",  )
+# appearance_mode_label.grid(row=5, column=0, rowspan=4, padx=20, pady=(10, 0))
+# appearance_mode_optionmenu = ctk.CTkOptionMenu(sidebar, values=["Light", "Dark", "System"],
+#                             command=change_appearance_mode_event)
+# appearance_mode_optionmenu.grid(row=7, column=0, padx=20, pady=(10, 10))
+# appearance_mode_optionmenu.set("Dark")
 
 # sidebar2 = ctk.CTkFrame(root)
 # sidebar2.grid(row=0, column=0, sticky="ns")
 # Function to create a frame for a specific asset type
+# create_asset_frame.asset_frame(f"{asset_type[0]}" )
 
-
-
-
-def switch_frame( asset):
-    global asset_frame
-    asset_frame.pack_forget()  # Hide the current frame
-    asset_frame = create_asset_frame(f"{asset}", lambda: print(f"Button clicked in Frame {asset}"))
-    asset_frame.grid(row=0, column=1, sticky="nsew")
-
+# def switch_frame( asset):
+#     global asset_frame
+#     asset_frame.grid_forget()  # Hide the current frame
+#     asset_frame = create_asset_frame(f"{asset}", lambda: print(f"Button clicked in Frame {asset}"))
+#     asset_frame.grid(row=0, column=1, sticky="nsew")
 
 
 
 # sidebar.pack(side="left", fill="y")
+# side_button_colors = [  "#6B5B95", "#45B8AC" , "#DD4124", "#009B77", "#45B8AC" ]   # Ultra Violet, Mimosa #EFC050,Tangerine Tango,  Emerald
+# side_button_text_colors = [ "#39FF14", "#fe4005", "#04d9ff", "#FFDF00", "#6B5B95" ]
+#
+# sidebar_buttons = []
+# for i,asset in enumerate(asset_type):
+#     button = ctk.CTkButton(sidebar, text=asset, width=120, height=35, font=ctk.CTkFont(size=15, weight="normal"), text_color=side_button_text_colors[2]  #"#39FF14"
+#                            , fg_color="black", hover_color="#45B8AC", border_color= "white" )
+#
+#     button.configure(hover_color="#006792" )                       # fg_color="lightblue", hover_color="lightgreen" )
+#     button.grid(row=i, column=0,  padx=20, pady=(0,10) , sticky="nsew" )
+#     sidebar_buttons.append(button)
+#
+#
+# for i, button in enumerate(sidebar_buttons):
+#     asset = asset_type[i]
+#     button.bind("<Button-1>", lambda e, asset=asset: switch_frame(asset))
 
-sidebar_buttons = []
-for i,asset in enumerate(asset_type):
-    button = ctk.CTkButton(sidebar, text=asset)
-    button.grid(row=i, column=0,  padx=20, pady=10)
-    sidebar_buttons.append(button)
-
-
-for i, button in enumerate(sidebar_buttons):
-    asset = asset_type[i]
-    button.bind("<Button-1>", lambda e, asset=asset: switch_frame(asset))
-
-root.mainloop()
