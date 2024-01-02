@@ -15,14 +15,14 @@ class get_clean_data:
 
       bar_list  = [ symbols , data ]
 
-      bar_list = cls.refined_df ( bar_list, step )
+      bar_list = cls.refined_df ( bar_list )
 
 
       return bar_list
 
 
   @classmethod
-  def refined_df(cls, bar_list, step  ):
+  def refined_df(cls, bar_list):
 
       symbols   = 0  # index 0 for symbols
       values    = 1  # index 1 for ohlc
