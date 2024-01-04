@@ -8,28 +8,31 @@ import pytz
 class get_clean_data:
 
   @classmethod
-  def get_data_np_df(cls, symbols , interval = None , period = None ):
+  def get_data_np_df(cls, symbols , interval = None , period = None, names = None ):
       # symbols = ['BTC-USD' , 'ETH-USD' ]
       if interval == None and period == None :
-        interval = '5m'
-        period = '1d'
+          interval = '5m'
+          period = '1d'
 
       data = [[0]]  * len(symbols)
 
       for i , symbol in  enumerate(symbols):
-        bar = yf.download(tickers=f'{symbol}' , interval=f'{interval}' , period=f'{period}' )
-        data[i] =  bar
+          bar = yf.download(tickers=f'{symbol}' , interval=f'{interval}' , period=f'{period}' )
+          data[i] =  bar
+      if names:
+          symbol_name =  [   str(symbols[i]) + " " + str(names[i]) for i in range(len(symbols))     ]
+          bar_list    =  [ symbol_name , data ]
 
-      bar_list  = [ symbols , data ]
+      else:
+          bar_list  = [ symbols , data ]
 
-      bar_list = cls.refined_df ( bar_list)
-
+      bar_list = cls.refined_df(bar_list)
 
       return bar_list
 
 
   @classmethod
-  def refined_df(cls, bar_list  ):
+  def refined_df(cls, bar_list ):
 
       symbols   = 0  # index 0 for symbols
       values    = 1  # index 1 for ohlc
@@ -37,6 +40,7 @@ class get_clean_data:
       for index, df in enumerate(bar_list[values]):
           df = df.drop('Adj Close', axis=1)
           df = df.drop('Volume', axis =1 )
+          # df = df.rename(columns={'Datetime': 'index'})
           df = df.fillna(df.mean())
           # resampled_df = df.resample(step).ohlc()
           # resampled_df = pd.DataFrame(resampled_data)
@@ -51,8 +55,9 @@ class get_clean_data:
                 column.append(name)
 
           np_df.dtype.names   = tuple(column)
-          np_df['index'] = np_df['index'].astype('datetime64[h]')
-
+          try:
+            np_df['index'] = np_df['index'].astype('datetime64[h]')
+          except: pass
           # np_df['index']  =  cls.change_time( date_time_index= np_df['index'] , format= format)
           bar_list[values][index]  =   np_df
 
@@ -951,7 +956,7 @@ class  indicators_lookback_mode( access_indicators ):
             smi =     [ element[0] for element in stochastic_momentum_list[sym] ]
             smi_ema = [ element[1] for element in stochastic_momentum_list[sym] ]
 
-            direction_smi        = [ element[0] for element in stochastic_momentum_crossover_list[sym] ]
+            direction_smi = [ element[0] for element in stochastic_momentum_crossover_list[sym] ]
             crossover_smi = [ element[1] for element in stochastic_momentum_crossover_list[sym] ]
 
 
@@ -1004,13 +1009,13 @@ class sorting :
 
       if order_type == 1 :
          order       = 'buy'
-         stop_loss   =  matches['atr_lower'][-1]
-         take_profit =  matches['atr_upper'][-1]
+         stop_loss   =  round(matches['atr_lower'][-1], 5)
+         take_profit =  round(matches['atr_upper'][-1], 5)
 
       elif order_type == -1 :
          order       = 'sell'
-         stop_loss   =  matches['atr_upper'][-1]
-         take_profit =  matches['atr_lower'][-1]
+         stop_loss   =  round(matches['atr_upper'][-1],5)
+         take_profit =  round(matches['atr_lower'][-1],5)
 
       time  = matches['index'][-1]
       return  symbol, order, take_profit, stop_loss, time
@@ -1020,15 +1025,15 @@ class sorting :
 
       symbol = matches['symbol'][-1]
 
-      if order_type == 1 :
-         order       = 'buy'
-         stop_loss   =  matches['atr_lower'][-1]
-         take_profit =  matches['atr_upper'][-1]
+      if order_type == 1:
+          order = 'buy'
+          stop_loss   = round(matches['atr_lower'][-1], 5)
+          take_profit = round(matches['atr_upper'][-1], 5)
 
-      elif order_type == -1 :
-         order       = 'sell'
-         stop_loss   =  matches['atr_upper'][-1]
-         take_profit =  matches['atr_lower'][-1]
+      elif order_type == -1:
+          order = 'sell'
+          stop_loss   = round(matches['atr_upper'][-1], 5)
+          take_profit = round(matches['atr_lower'][-1], 5)
 
       time  = matches['index'][-1]
       return  symbol, order, take_profit, stop_loss, time
@@ -1087,63 +1092,55 @@ class sorting :
 
       return sorted_data, signal_list
 
+    @classmethod
+    def adx_stochastic_momentum(cls, bar_df, last_candles=10, cross_only=False, chart_type=None):
+        strategy = "stochastic_momentum_crossover"
+        sort_index, sell_signal_list, buy_signal_list = [], [], []
+        for index, ohlc in enumerate(bar_df[sorting.values]):
+
+            observe = ohlc[-last_candles:]
+            # crossover_smi
+            volatile_adx = (observe['Average-Directional-Index'] > 18) & (observe['Average-Directional-Index'] < 25)
+            mask_downtrend_crossover = observe['crossover_smi'] == -1.0
+            downtrend_heikin_ashi = observe['Heikin-Ashi-Status'] == 'Red'
+                             
+            mask_uptrend_crossover = observe['crossover_smi'] == 1.0
+            uptrend_heikin_ashi = observe['Heikin-Ashi-Status'] == 'Green'
+
+            if cross_only:
+                find_s, find_b = mask_downtrend_crossover, mask_uptrend_crossover
+            else:
+                find_s, find_b = volatile_adx & mask_downtrend_crossover & downtrend_heikin_ashi, volatile_adx & mask_uptrend_crossover & uptrend_heikin_ashi
+            matches_s = observe[find_s]
+            matches_b = observe[find_b]
+
+            if len(matches_s) > 0 and len(matches_b) > 0:
+                matches_s, matches_b = cls.clean_duplicate(find_s, find_b, observe)
+
+            if len(matches_s) > 0:
+                sort_index.append(index)
+                symbol, order, take_profit, stop_loss, time = cls.get_signal_data(matches_s, order_type=-1)
+                sell_signal = [symbol, order, take_profit, stop_loss, strategy, time, chart_type]
+                sell_signal_list.append(sell_signal)
+
+            if len(matches_b) > 0:
+                sort_index.append(index)
+                symbol, order, take_profit, stop_loss, time = cls.get_signal_data(matches_b, order_type=1)
+                buy_signal = [symbol, order, take_profit, stop_loss, strategy, time, chart_type]
+                buy_signal_list.append(buy_signal)
+
+        sorted_data = [bar_df[sorting.values][i] for i in range(len(bar_df[sorting.values])) if i in sort_index]
+
+        return sorted_data, sell_signal_list, buy_signal_list
 
     @classmethod
-    def sort_uptrend_crossover(cls, bar_df, last_candles = 10,  chart_type = None ):
-
-
-      sort_index, signal_list  =  [], []
-      for index, ohlc in enumerate(bar_df[sorting.values]):
-
-          observe = ohlc[-last_candles:]
-
-          volatile_adx = (observe['Average-Directional-Index'] > 15) &  (observe['Average-Directional-Index'] < 25)
-          mask_uptrend_crossover  = observe['Crossover'] == 1
-          uptrend_heikin_ashi = observe['Heikin-Ashi-Status'] == 'Green'
-
-          find    =  volatile_adx & mask_uptrend_crossover & uptrend_heikin_ashi
-          matches =  observe[find]
-          if  len(matches) > 0 :
-              sort_index.append(index)
-              symbol, order, stop_loss, take_profit, time  =  cls.get_signal_data( matches, order_type = 1 )
-              signal  =  [symbol, order, stop_loss, take_profit, time, chart_type ]
-              signal_list.append(signal)
-
-      sorted_data = [ bar_df[sorting.values][i] for i in range(len(bar_df[sorting.values])) if i in sort_index ]
-
-      return sorted_data, signal_list
-
-    @classmethod
-    def sort_downtrend_crossover(cls, bar_df,  last_candles=10,  chart_type = None ):
-
-      sort_index, signal_list  =  [], []
-      for index, ohlc in enumerate(bar_df[sorting.values]):
-
-          observe = ohlc[-last_candles:]
-
-          volatile_adx = (observe['Average-Directional-Index'] > 18) &  (observe['Average-Directional-Index'] < 25)
-          mask_downtrend_crossover  = observe['Crossover'] == -1
-          downtrend_heikin_ashi  = observe['Heikin-Ashi-Status'] == 'Red'
-
-          find    = volatile_adx & mask_downtrend_crossover & downtrend_heikin_ashi
-          matches = observe[find]
-          if  len(matches) > 0 :
-              sort_index.append(index)
-              symbol, order, stop_loss, take_profit, time  =  cls.get_signal_data( matches, order_type = -1 )
-              signal  =  [symbol, order, stop_loss, take_profit, time, chart_type ]
-              signal_list.append(signal)
-      sorted_data = [ bar_df[sorting.values][i] for i in range(len(bar_df[sorting.values])) if i in sort_index ]
-
-      return sorted_data, signal_list
-
-    @classmethod
-    def  adx_stochastic_momentum(cls, bar_df, last_candles = 10, cross_only= True , chart_type = None ):
-
+    def  adx_stochastic_momentum_direction(cls, bar_df, last_candles = 10, cross_only= False , chart_type = None ):
+      strategy = "stochastic_momentum_direction"
       sort_index, sell_signal_list, buy_signal_list = [] , [], []
       for index, ohlc in enumerate(bar_df[sorting.values]):
 
         observe = ohlc[-last_candles:]
-
+         # crossover_smi
         volatile_adx = (observe['Average-Directional-Index'] > 18) &  (observe['Average-Directional-Index'] < 25)
         mask_downtrend_crossover = observe['direction_smi']   ==  -1.0
         downtrend_heikin_ashi    = observe['Heikin-Ashi-Status'] == 'Red'
@@ -1164,13 +1161,13 @@ class sorting :
         if  len(matches_s) > 0 :
               sort_index.append(index)
               symbol, order, take_profit, stop_loss, time  =  cls.get_signal_data( matches_s, order_type = -1 )
-              sell_signal  =  [symbol, order, take_profit, stop_loss,  time, chart_type]
+              sell_signal  =  [symbol, order, take_profit, stop_loss, strategy, time, chart_type]
               sell_signal_list.append(sell_signal)
 
         if  len(matches_b) > 0 :
               sort_index.append(index)
               symbol, order, take_profit, stop_loss, time  =  cls.get_signal_data( matches_b, order_type = 1 )
-              buy_signal   =  [symbol, order, take_profit, stop_loss, time, chart_type]
+              buy_signal   =  [symbol, order, take_profit, stop_loss, time, strategy, chart_type]
               buy_signal_list.append(buy_signal)
 
       sorted_data = [ bar_df[sorting.values][i] for i in range(len(bar_df[sorting.values])) if i in sort_index ]
@@ -1179,17 +1176,17 @@ class sorting :
 
     @classmethod
     def  adx_crossover_ema(cls, bar_df, last_candles = 10, cross_only= True , chart_type = None ):
-
+      strategy = "ema_crossover"
       sort_index, sell_signal_list, buy_signal_list = [] , [], []
       for index, ohlc in enumerate(bar_df[sorting.values]):
 
         observe = ohlc[-last_candles:]
 
         volatile_adx = (observe['Average-Directional-Index'] > 18) & (observe['Average-Directional-Index'] < 25)
-        mask_downtrend_crossover = observe['Direction']   ==  -1.0
+        mask_downtrend_crossover = observe['Crossover']   ==  -1.0
         downtrend_heikin_ashi    = observe['Heikin-Ashi-Status'] == 'Red'
 
-        mask_uptrend_crossover  = observe['Direction']   == 1.0
+        mask_uptrend_crossover  = observe['Crossover']   == 1.0
         uptrend_heikin_ashi     = observe['Heikin-Ashi-Status'] == 'Green'
 
 
@@ -1204,18 +1201,58 @@ class sorting :
         if  len(matches_s) > 0 :
               sort_index.append(index)
               symbol, order, take_profit, stop_loss, time  =  cls.get_signal_data_crossover( matches_s, order_type = -1 )
-              sell_signal  =  [symbol, order, take_profit, stop_loss,  time, chart_type]
+              sell_signal  =  [symbol, order, take_profit, stop_loss, strategy,  time, chart_type]
               sell_signal_list.append(sell_signal)
 
         if  len(matches_b) > 0 :
               sort_index.append(index)
               symbol, order, take_profit, stop_loss, time  =  cls.get_signal_data_crossover( matches_b, order_type = 1 )
-              buy_signal   =  [symbol, order, take_profit, stop_loss, time, chart_type]
+              buy_signal   =  [symbol, order, take_profit, stop_loss, strategy, time, chart_type]
               buy_signal_list.append(buy_signal)
 
       sorted_data = [ bar_df[sorting.values][i] for i in range(len(bar_df[sorting.values])) if i in sort_index ]
 
       return sorted_data, sell_signal_list, buy_signal_list
+
+    @classmethod
+    def adx_direction_ema(cls, bar_df, last_candles=10, cross_only=False, chart_type=None):
+        strategy = "ema_direction"
+        sort_index, sell_signal_list, buy_signal_list = [], [], []
+        for index, ohlc in enumerate(bar_df[sorting.values]):
+
+            observe = ohlc[-last_candles:]
+
+            volatile_adx = (observe['Average-Directional-Index'] > 18) & (observe['Average-Directional-Index'] < 25)
+            mask_downtrend_crossover = observe['Direction'] == -1.0
+            downtrend_heikin_ashi = observe['Heikin-Ashi-Status'] == 'Red'
+
+            mask_uptrend_crossover = observe['Direction'] == 1.0
+            uptrend_heikin_ashi = observe['Heikin-Ashi-Status'] == 'Green'
+
+            if cross_only:
+                find_s, find_b = mask_downtrend_crossover, mask_uptrend_crossover
+            else:
+                find_s, find_b = volatile_adx & mask_downtrend_crossover & downtrend_heikin_ashi, volatile_adx & mask_uptrend_crossover & uptrend_heikin_ashi
+            matches_s = observe[find_s]
+            matches_b = observe[find_b]
+            if len(matches_s) > 0 and len(matches_b) > 0:
+                matches_s, matches_b = cls.clean_duplicate(find_s, find_b, observe)
+
+            if len(matches_s) > 0:
+                sort_index.append(index)
+                symbol, order, take_profit, stop_loss, time = cls.get_signal_data_crossover(matches_s, order_type=-1)
+                sell_signal = [symbol, order, take_profit, stop_loss, strategy, time, chart_type]
+                sell_signal_list.append(sell_signal)
+
+            if len(matches_b) > 0:
+                sort_index.append(index)
+                symbol, order, take_profit, stop_loss, time = cls.get_signal_data_crossover(matches_b, order_type=1)
+                buy_signal = [symbol, order, take_profit, stop_loss, strategy, time, chart_type]
+                buy_signal_list.append(buy_signal)
+
+        sorted_data = [bar_df[sorting.values][i] for i in range(len(bar_df[sorting.values])) if i in sort_index]
+
+        return sorted_data, sell_signal_list, buy_signal_list
 
     @classmethod
     def  stochastic_momentum_uptrend(cls, bar_df, last_candles = 10, cross_only= True , chart_type = None ):
@@ -1273,7 +1310,7 @@ class sorting :
           up_index    = np.where(find_b)[0]
           down_index  = np.where(find_s)[0]
 
-          if up_index[-1] > down_index[-1]:   matches_s, matches_b =  [] , observe[find_b]
+          if   up_index[-1] > down_index[-1]: matches_s, matches_b =  [] , observe[find_b]
           elif up_index[-1] < down_index[-1]: matches_s, matches_b =  observe[find_s] , []
 
           return  matches_s, matches_b
