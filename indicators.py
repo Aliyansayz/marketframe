@@ -747,9 +747,11 @@ class linear_regression_channel(stochastic_momentum_index):
                              np.where(diff_slope < 0, "downtrend_decreasing", "downtrend"),
                              np.where(diff_slope == 0, "NoTrend", "flat_trend")) )
                               
-        outofchannel = np.where( (slope > 0) & (price < endy - dev * dev_multiplier), -1,  # Lower breakout
-                       np.where(  (slope < 0) & (price > endy + dev * dev_multiplier), 1,  # Upper breakout
-                                 0 ) ) # No breakout
+        outofchannel = np.where( (slope > 0) & (price < endy - dev * dev_multiplier), "-1 lower breakout",  # Lower breakout
+                       np.where(  (slope < 0) & (price > endy + dev * dev_multiplier), "1 upper breakout",  # Upper breakout
+                         "0 no breakout" ) ) # No breakout
+
+    
   
         return  labels, outofchannel
 
