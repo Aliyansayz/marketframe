@@ -785,7 +785,7 @@ class linear_regression_channel(stochastic_momentum_index):
   
         slope, intercept, endy, dev, mid =  channel_values[0], channel_values[1], channel_values[2], channel_values[3], channel_values[4]
   
-        slope, intercept, endy, dev, mid = round(slope, 2) , round(intercept,2) round(endy,2), round(dev,2), round(mid,2)
+        slope, intercept, endy, dev, mid = round(slope, 2), round(intercept,2), round(endy,2), round(dev,2), round(mid,2)
   
         return  slope, intercept, endy, dev, mid
 
