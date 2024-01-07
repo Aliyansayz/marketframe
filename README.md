@@ -20,6 +20,23 @@ Tells us market prices in real time with technical indicators, crossover status.
 * ATR multiplier = 1.7 
 * BB Multiplier  = 2.0 
 
+
+# Recommended Values Crypto 15 Minutes Timeframe 
+
+
+* EMA period = 20/50
+  
+* Stochastic Momentum Index= 20, 5, 5 -> period, SMI calculation period, SMI_based_ema
+* ADX period = 20 
+
+* ATR period = 5 
+* BB period  = 20 
+
+* ATR multiplier = 1.7 
+* BB Multiplier  = 2.0 
+
+
+
 # Demostartion
 
 ## Selecting Symbols
