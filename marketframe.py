@@ -25,7 +25,7 @@ class get_clean_data:
 
         else:
             bar_list = [symbols, data]
-
+        # print(bar_list)
         bar_list = cls.refined_df(bar_list)
 
         return bar_list
@@ -35,8 +35,11 @@ class get_clean_data:
 
         symbols = 0  # index 0 for symbols
         values = 1  # index 1 for ohlc
-
+        df_to_remove = [ ]
         for index, df in enumerate(bar_list[values]):
+            if  df.empty:
+                df_to_remove.append(index)
+                continue
             df = df.drop('Adj Close', axis=1)
             df = df.drop('Volume', axis=1)
             # df = df.rename(columns={'Datetime': 'index'})
@@ -60,7 +63,13 @@ class get_clean_data:
                 pass
             # np_df['index']  =  cls.change_time( date_time_index= np_df['index'] , format= format)
             bar_list[values][index] = np_df
+        df_to_remove.sort(reverse=True)
 
+        for df_index in df_to_remove:
+            bar_list[values].pop(df_index)
+            bar_list[symbols].pop(df_index)
+
+        # print(df_to_remove)
         return bar_list
 
 
@@ -138,10 +147,10 @@ class resample_data:
 
         for symbol, ohlc in enumerate(bar_list[values]):
 
-            if format:
+            if format != None :
                 date_index = self.change_time(np.datetime_as_string(ohlc['index'], unit='s'), format=format)
 
-            else:
+            else :
                 date_index = np.array(ohlc['index'], dtype='datetime64[h]')
 
             if step > 1:
@@ -889,11 +898,102 @@ class stochastic_momentum_index(stochastic_oscillator):
             return stochastic_momentum_list
 
 
-class access_indicators(stochastic_momentum_index):
+class linear_regression_channel(stochastic_momentum_index):
+
+    def slope_intercept_func(self, batch):
+        return np.polyfit(np.arange(len(batch)), batch, 1)
+
+    def deviation_func(self, batch):
+        slope, intercept = np.polyfit(np.arange(len(batch)), batch, 1)
+        dev = np.sqrt(np.mean((batch - (slope * np.arange(len(batch)) + intercept)) ** 2))
+        return dev
+
+    def get_linear_regression_channel_lookback(self, bar_list, period=21, dev_multiplier=2.0, lookback=10):
+
+        symbols, values = 0, 1
+
+        channel_list = [[]] * len(bar_list[values])
+        trend_outofchannel_list = [[]] * len(bar_list[values])
+
+        for index, ohlc in enumerate(bar_list[values]):
+
+            open, high, low, close = ohlc['Open'], ohlc['High'], ohlc['Low'], ohlc['Close']
+            price = (high + low + close) / 3
+            slope, intercept, endy, dev, mid = self.linear_regression_channel(price, period)
+            trend_label, outofchannel = self.trend_out_channel_status(price, slope, endy, dev, dev_multiplier)
+
+            if lookback:
+                slope, intercept, endy, dev, mid = slope[-lookback:], intercept[-lookback:], endy[-lookback:], dev[
+                                                                                                               -lookback:], mid[
+                                                                                                                            -lookback:]
+                trend_label, outofchannel = trend_label[-lookback:], outofchannel[-lookback:]
+
+            regression_channel = [[slope[i], intercept[i], endy[i], dev[i], mid[i]] for i in range(len(slope))]
+            channel_list[index] = regression_channel
+            trend_label_outofchannel_status = [[trend_label[i], outofchannel[i]] for i in range(len(trend_label))]
+            trend_outofchannel_list[index] = trend_label_outofchannel_status
+
+        return channel_list, trend_outofchannel_list
+
+    def trend_out_channel_status(self, price, slope, endy, dev, dev_multiplier=2.0):
+
+        diff_slope = slope - np.roll(slope, 1)
+
+        labels = np.where(slope > 0,
+                          np.where(diff_slope > 0, "uptrend_increasing", "uptrend"),
+                          np.where(slope < 0,
+                                   np.where(diff_slope < 0, "downtrend_decreasing", "downtrend"),
+                                   np.where(diff_slope == 0, "NoTrend", "flat_trend")))
+
+        outofchannel = np.where((slope > 0) & (price < endy - dev * dev_multiplier), "-1 lower breakout",
+                                # Lower breakout
+                                np.where((slope < 0) & (price > endy + dev * dev_multiplier), "1 upper breakout",
+                                         # Upper breakout
+                                         "0 no breakout"))  # No breakout
+
+        return labels, outofchannel
+
+    def linear_regression_channel(self, arr, period):
+
+        slope = [[]] * (len(arr) - period + 1)
+        intercept = [[]] * (len(arr) - period + 1)
+        dev = [[]] * (len(arr) - period + 1)
+        endy = [[]] * (len(arr) - period + 1)
+
+        for i in range(len(arr) - period + 1):
+            batch = arr[i:i + period]
+
+            slope[i] = self.slope_intercept_func(batch)[0]
+            intercept[i] = self.slope_intercept_func(batch)[1]
+            endy[i] = intercept[i] + slope[i] * (period - 1)
+            dev[i] = self.deviation_func(batch)
+
+        mid = np.convolve(arr, np.ones(period) / period, mode='valid')
+        channel_values = [slope, intercept, endy, dev, mid]
+
+        # Add up missing values as average
+        window = period - 1
+
+        for index, arr in enumerate(channel_values):
+            fixed_arr = np.empty(window + len(arr), dtype=float)
+            fixed_arr[:window] = np.nan * window
+            fixed_arr[window:] = arr
+            fixed_arr[np.isnan(fixed_arr)] = np.nanmean(arr[:period])
+            channel_values[index] = fixed_arr
+
+        slope, intercept, endy, dev, mid = channel_values[0], channel_values[1], channel_values[2], channel_values[3], \
+                                           channel_values[4]
+
+        slope, intercept, endy, dev, mid = np.round(slope, 2), np.round(intercept, 2), np.round(endy, 2), np.round(dev, 2), np.round(mid, 2)
+
+
+        return slope, intercept, endy, dev, mid
+
+
+class access_indicators(linear_regression_channel):
 
     def __init__(self):
         pass
-
 
 """
 bar_df = indicators_lookback_mode.transform_data_list( refine_list = refined_list, multiplier= 1.7 , atr_period = 5,  adx_period = 8 ,   lookback = 1  , ha_ohlc = True)
@@ -902,118 +1002,107 @@ print(bar_df)
 """
 
 
-class indicators_lookback_mode(access_indicators):
+class  indicators_lookback_mode( access_indicators ):
 
-    @classmethod
-    def transform_data_list(cls, refine_list, multiplier=1.7, atr_period=5, adx_period=8, lookback=10,
-                            ema_period=[5, 20], ha_ohlc=True):
+  @classmethod
+  def transform_data_list(cls, refine_list ,  multiplier= 1.7 , atr_period = 5,  adx_period = 8,   lookback = 10, ema_period = [5, 20], ha_ohlc = True ):
 
-        symbols = 0
-        values = 1
-        indicator = cls()  # universal class of project => adx_indicator
+    symbols   = 0
+    values    = 1
+    indicator = cls() # universal class of project => access_indicator
 
-        heikin_ashi = indicator.get_heikin_ashi(bar_list=refine_list, ohlc_data=True)
+    heikin_ashi = indicator.get_heikin_ashi (bar_list = refine_list,  ohlc_data=True)
 
-        # crossover_direction_list  =  adx_atr_bands_indicator.crossover_direction_lookback(bar_list = refine_list, lookback = lookback )
-        ha_status_list = indicator.get_heikin_ashi(refine_list, lookback=lookback)
-        if ha_ohlc:
-            refine_list = indicator.normal_to_ha(data_list=refine_list, ha_ohlc_list=heikin_ashi)
+    # crossover_direction_list  =  adx_atr_bands_indicator.crossover_direction_lookback(bar_list = refine_list, lookback = lookback )
+    ha_status_list = indicator.get_heikin_ashi ( refine_list, lookback = lookback)
+    if ha_ohlc :
+      refine_list = indicator.normal_to_ha(data_list = refine_list, ha_ohlc_list = heikin_ashi )
 
-        ha_ohlc_list = indicator.get_heikin_ashi(bar_list=refine_list, lookback=lookback, ohlc_data=True)
+    ha_ohlc_list = indicator.get_heikin_ashi (bar_list = refine_list, lookback = lookback, ohlc_data=True)
 
-        crossover_direction_list = indicator.crossover_direction_lookback(bar_list=refine_list, ema_period=ema_period,
-                                                                          lookback=lookback)
+    crossover_direction_list   =  indicator.crossover_direction_lookback(bar_list = refine_list, ema_period = ema_period ,lookback = lookback )
 
-        stochastic_momentum_list = indicator.stochastic_momentum_lookback(bar_list=refine_list, period=ema_period[1],
-                                                                          lookback=lookback, ema_period=5)
+    stochastic_momentum_list =  indicator.stochastic_momentum_lookback( bar_list = refine_list, period = ema_period[1], lookback = lookback, ema_period = 5)
 
-        stochastic_momentum_crossover_list = indicator.stochastic_momentum_lookback(bar_list=refine_list,
-                                                                                    period=ema_period[1],
-                                                                                    lookback=lookback, ema_period=5,
-                                                                                    crossover_direction=True)
-        emaz_list = indicator.ema_lookback(bar_list=refine_list, lookback=lookback, ema_period=ema_period)
+    stochastic_momentum_crossover_list = indicator.stochastic_momentum_lookback( bar_list = refine_list, period = ema_period[1], lookback = lookback, ema_period = ema_period[0], crossover_direction=True)
+    emaz_list  =  indicator.ema_lookback( bar_list = refine_list, lookback = lookback , ema_period = ema_period )
 
-        atr_bands_list = indicator.atr_bands_lookback(refine_list, multiplier, period=atr_period, lookback=lookback)
-        adx_value_list = indicator.adx_lookback(bar_list=refine_list, period=adx_period, lookback=lookback)
+    atr_bands_list = indicator.atr_bands_lookback( refine_list , multiplier,  period = atr_period ,  lookback = lookback  )
+    adx_value_list = indicator.adx_lookback( bar_list = refine_list,   period = adx_period , lookback = lookback)
 
-        bollinger_bands_list = indicator.get_bollinger_bands(bar_list=refine_list, lookback=lookback)
+    channel_list, trend_outofchannel_list = indicator.get_linear_regression_channel_lookback(bar_list= refine_list , period=21, dev_multiplier=2.0, lookback = lookback )
+    bollinger_bands_list = indicator.get_bollinger_bands( bar_list= refine_list, lookback = lookback )
 
-        # lookback = 10
-        dt = np.dtype([('index', 'datetime64[h]'), ('symbol', 'U20'), ('Open', float), ('High', float), ('Low', float),
-                       ('Close', float), ('Heikin-Ashi-Status', 'U10'), ('Direction', float),
-                       ('Average-Directional-Index', float), ('Crossover', float), \
-                       ('Stop_Loss', float), ('Take_Profit', float), ('direction_smi', float), ('crossover_smi', float),
-                       ('ema_low', float), ('ema_high', float), ('smi', float), ('smi_ema', float), ('bb_lower', float),
-                       ('bb_upper', float), ('atr_lower', float), ('atr_upper', float), ('ha_open', float),
-                       ('ha_high', float), ('ha_low', float), ('ha_close', float)])
+    # lookback = 10
+    dt   = np.dtype([ ('index', 'datetime64[h]'),  ('symbol', 'U20'), ('Open', float ), ('High', float ), ('Low', float),  ('Close', float ),  ('Heikin-Ashi-Status', 'U10'),  ('Direction', float), ('Average-Directional-Index', float), ('Crossover', float),   \
+        ('Stop_Loss', float), ('Take_Profit', float), ('direction_smi', float), ('crossover_smi', float), ('ema_low', float), ('ema_high', float), ('smi', float), ('smi_ema', float), ('trend_status', 'U10' ), ('outofchannel_status', 'U10' ), ('bb_lower', float ), ('bb_upper', float), ('atr_lower', float), ('atr_upper', float ), ('ha_open', float), ('ha_high', float),('ha_low', float),('ha_close', float)  ])
 
-        column_names = dt.names
-        data = [[0]] * len(refine_list[symbols])
 
-        for sym, ohlc in enumerate(refine_list[values]):
+    column_names = dt.names
+    data = [[0]]  * len(refine_list[symbols])
 
-            index = ohlc['index'][-lookback:]
+    for sym , ohlc in enumerate(refine_list[values]):
+
+            index  = ohlc['index'][-lookback:]
             symbol = ohlc['symbol'][-lookback:]
-            open = ohlc['Open'][-lookback:]
-            high = ohlc['High'][-lookback:]
-            low = ohlc['Low'][-lookback:]
-            close = ohlc['Close'][-lookback:]
+            open   = ohlc['Open'][-lookback:]
+            high   = ohlc['High'][-lookback:]
+            low    = ohlc['Low'][-lookback:]
+            close  = ohlc['Close'][-lookback:]
 
-            heikin_ashi_status = [element for element in ha_status_list[sym]]
+            heikin_ashi_status = [  element for element in ha_status_list[sym]  ]
 
             # fractal_status  = [ element  for  element in ha_ohlc_list[sym]  ]
-            ha_open, ha_close = [element for element in ha_ohlc_list[sym][0]], [element for element in
-                                                                                ha_ohlc_list[sym][3]]
-            ha_high, ha_low = [element for element in ha_ohlc_list[sym][1]], [element for element in
-                                                                              ha_ohlc_list[sym][2]]
+            ha_open , ha_close = [ element for  element in ha_ohlc_list[sym][0] ], [ element for  element in ha_ohlc_list[sym][3] ]
+            ha_high , ha_low   = [ element for  element in ha_ohlc_list[sym][1] ], [ element for  element in ha_ohlc_list[sym][2] ]
 
-            smi = [element[0] for element in stochastic_momentum_list[sym]]
-            smi_ema = [element[1] for element in stochastic_momentum_list[sym]]
+            smi =     [ element[0] for element in stochastic_momentum_list[sym] ]
+            smi_ema = [ element[1] for element in stochastic_momentum_list[sym] ]
 
-            direction_smi = [element[0] for element in stochastic_momentum_crossover_list[sym]]
-            crossover_smi = [element[1] for element in stochastic_momentum_crossover_list[sym]]
+            trend_status        = [ element[0] for element in trend_outofchannel_list[sym] ]
+            outofchannel_status = [ element[1] for element in trend_outofchannel_list[sym] ]
 
-            adx_value = [element for element in adx_value_list[sym]]
-            lower_band = [element[0] for element in atr_bands_list[sym]]
-            upper_band = [element[1] for element in atr_bands_list[sym]]
+            direction_smi = [ element[0] for element in stochastic_momentum_crossover_list[sym] ]
+            crossover_smi = [ element[1] for element in stochastic_momentum_crossover_list[sym] ]
 
-            bb_lower = [element[0] for element in bollinger_bands_list[sym]]
-            bb_upper = [element[1] for element in bollinger_bands_list[sym]]
-            bb_bands = [bb_lower, bb_upper]
+
+            adx_value  = [  element    for element in adx_value_list[sym]  ]
+            lower_band = [  element[0] for element in atr_bands_list[sym]  ]
+            upper_band = [  element[1] for element in atr_bands_list[sym]  ]
+
+            bb_lower = [  element[0] for element in bollinger_bands_list[sym]  ]
+            bb_upper = [  element[1] for element in bollinger_bands_list[sym]  ]
+            bb_bands = [ bb_lower,  bb_upper ]
             # crossover =   crossover_direction_list[index][dynamic--for next values of crossover of date time index][0-->static for crossover]
-            crossover = [element[0] for element in crossover_direction_list[sym]]
-            direction = [element[1] for element in crossover_direction_list[sym]]
+            crossover = [ element[0] for element in crossover_direction_list[sym] ]
+            direction = [ element[1] for element in crossover_direction_list[sym] ]
 
-            short_ema = [element[0] for element in emaz_list[sym]]
-            long_ema = [element[1] for element in emaz_list[sym]]
+            short_ema = [ element[0] for element in emaz_list[sym] ]
+            long_ema  = [ element[1] for element in emaz_list[sym] ]
             # ha_ohlc_list[symbol]   =  [ha_open, ha_high, ha_low, ha_close]
-            ha_ohlc = [element for element in ha_ohlc_list[sym]]
+            ha_ohlc = [ element for  element in  ha_ohlc_list[sym] ]
 
             ohlc_df = np.empty(len(close), dtype=dt)
 
-            for i in range(0, len(ohlc_df)):
+            for i in range(0 , len(ohlc_df)):
 
-                stop_loss = 0
+                stop_loss   = 0
                 take_profit = 0
-                if crossover[i] == 1 or direction[i] == 1:
-                    stop_loss = lower_band[i]
-                    take_profit = upper_band[i]
+                if crossover[i] == 1  or  direction[i] == 1 :
+                      stop_loss   = lower_band[i]
+                      take_profit = upper_band[i]
 
-                elif crossover[i] == -1 or direction[i] == -1:
-                    stop_loss = upper_band[i]
-                    take_profit = lower_band[i]
+                elif crossover[i] == -1  or  direction[i] == -1 :
+                      stop_loss   = upper_band[i]
+                      take_profit = lower_band[i]
 
-                ohlc_df[i] = (
-                index[i], symbol[i], open[i], high[i], low[i], close[i], heikin_ashi_status[i], direction[i],
-                adx_value[i], \
-                crossover[i], stop_loss, take_profit, direction_smi[i], crossover_smi[i], short_ema[i], long_ema[i],
-                smi[i], smi_ema[i], bb_lower[i], bb_upper[i], lower_band[i], upper_band[i], ha_open[i], ha_high[i],
-                ha_low[i], ha_close[i])
-            #
+                ohlc_df[i] = ( index[i], symbol[i], open[i], high[i], low[i], close[i], heikin_ashi_status[i], direction[i], adx_value[i], \
+                               crossover[i], stop_loss, take_profit, direction_smi[i] , crossover_smi[i],  short_ema[i], long_ema[i], smi[i], smi_ema[i], trend_status[i], outofchannel_status[i], bb_lower[i], bb_upper[i], lower_band[i], upper_band[i], ha_open[i], ha_high[i] , ha_low[i], ha_close[i]  )
+#
 
             data[sym] = ohlc_df
 
-        return [column_names, data]
+    return [column_names, data]
 
 
 class sorting:
