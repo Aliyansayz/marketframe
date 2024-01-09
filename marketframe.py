@@ -25,7 +25,7 @@ class get_clean_data:
 
         else:
             bar_list = [symbols, data]
-
+        # print(bar_list)
         bar_list = cls.refined_df(bar_list)
 
         return bar_list
@@ -35,8 +35,11 @@ class get_clean_data:
 
         symbols = 0  # index 0 for symbols
         values = 1  # index 1 for ohlc
-
+        df_to_remove = [ ]
         for index, df in enumerate(bar_list[values]):
+            if  df.empty:
+                df_to_remove.append(index)
+                continue
             df = df.drop('Adj Close', axis=1)
             df = df.drop('Volume', axis=1)
             # df = df.rename(columns={'Datetime': 'index'})
@@ -60,7 +63,13 @@ class get_clean_data:
                 pass
             # np_df['index']  =  cls.change_time( date_time_index= np_df['index'] , format= format)
             bar_list[values][index] = np_df
+        df_to_remove.sort(reverse=True)
 
+        for df_index in df_to_remove:
+            bar_list[values].pop(df_index)
+            bar_list[symbols].pop(df_index)
+
+        # print(df_to_remove)
         return bar_list
 
 
@@ -138,10 +147,10 @@ class resample_data:
 
         for symbol, ohlc in enumerate(bar_list[values]):
 
-            if format:
+            if format != None :
                 date_index = self.change_time(np.datetime_as_string(ohlc['index'], unit='s'), format=format)
 
-            else:
+            else :
                 date_index = np.array(ohlc['index'], dtype='datetime64[h]')
 
             if step > 1:
@@ -975,7 +984,7 @@ class linear_regression_channel(stochastic_momentum_index):
         slope, intercept, endy, dev, mid = channel_values[0], channel_values[1], channel_values[2], channel_values[3], \
                                            channel_values[4]
 
-        slope, intercept, endy, dev, mid = round(slope, 2), round(intercept, 2), round(endy, 2), round(dev, 2), round(mid, 2)
+        slope, intercept, endy, dev, mid = np.round(slope, 2), np.round(intercept, 2), np.round(endy, 2), np.round(dev, 2), np.round(mid, 2)
 
 
         return slope, intercept, endy, dev, mid
@@ -1002,31 +1011,33 @@ class  indicators_lookback_mode( access_indicators ):
     values    = 1
     indicator = cls() # universal class of project => access_indicator
 
-    heikin_ashi = indicator.get_heikin_ashi (bar_list = refine_list,  ohlc_data=True)
-
-    # crossover_direction_list  =  adx_atr_bands_indicator.crossover_direction_lookback(bar_list = refine_list, lookback = lookback )
-    ha_status_list = indicator.get_heikin_ashi ( refine_list, lookback = lookback)
-    if ha_ohlc :
-      refine_list = indicator.normal_to_ha(data_list = refine_list, ha_ohlc_list = heikin_ashi )
-
-    ha_ohlc_list = indicator.get_heikin_ashi (bar_list = refine_list, lookback = lookback, ohlc_data=True)
 
     crossover_direction_list   =  indicator.crossover_direction_lookback(bar_list = refine_list, ema_period = ema_period ,lookback = lookback )
 
     stochastic_momentum_list =  indicator.stochastic_momentum_lookback( bar_list = refine_list, period = ema_period[1], lookback = lookback, ema_period = 5)
-
     stochastic_momentum_crossover_list = indicator.stochastic_momentum_lookback( bar_list = refine_list, period = ema_period[1], lookback = lookback, ema_period = ema_period[0], crossover_direction=True)
-    emaz_list  =  indicator.ema_lookback( bar_list = refine_list, lookback = lookback , ema_period = ema_period )
 
-    atr_bands_list = indicator.atr_bands_lookback( refine_list , multiplier,  period = atr_period ,  lookback = lookback  )
-    adx_value_list = indicator.adx_lookback( bar_list = refine_list,   period = adx_period , lookback = lookback)
+    emaz_list = indicator.ema_lookback(bar_list=refine_list, lookback=lookback, ema_period=ema_period)
 
-    channel_list, trend_outofchannel_list = indicator.get_linear_regression_channel_lookback(bar_list= refine_list , period=21, dev_multiplier=2.0, lookback = lookback )
+    adx_value_list = indicator.adx_lookback(bar_list=refine_list, period=adx_period, lookback=lookback)
+    atr_bands_list = indicator.atr_bands_lookback(refine_list, multiplier, period=atr_period, lookback=lookback)
+
+    channel_list, trend_outofchannel_list = indicator.get_linear_regression_channel_lookback(bar_list=refine_list, period=21, dev_multiplier=2.0, lookback=lookback)
+
     bollinger_bands_list = indicator.get_bollinger_bands( bar_list= refine_list, lookback = lookback )
+
+
+    # crossover_direction_list  =  adx_atr_bands_indicator.crossover_direction_lookback(bar_list = refine_list, lookback = lookback )
+    ha_status_list = indicator.get_heikin_ashi ( refine_list, lookback = lookback)
+    heikin_ashi = indicator.get_heikin_ashi (bar_list = refine_list,  ohlc_data=True)
+
+    if ha_ohlc :
+      refine_list = indicator.normal_to_ha(data_list = refine_list, ha_ohlc_list = heikin_ashi )
+    ha_ohlc_list = indicator.get_heikin_ashi (bar_list = refine_list, lookback = lookback, ohlc_data=True)
 
     # lookback = 10
     dt   = np.dtype([ ('index', 'datetime64[h]'),  ('symbol', 'U20'), ('Open', float ), ('High', float ), ('Low', float),  ('Close', float ),  ('Heikin-Ashi-Status', 'U10'),  ('Direction', float), ('Average-Directional-Index', float), ('Crossover', float),   \
-        ('Stop_Loss', float), ('Take_Profit', float), ('direction_smi', float), ('crossover_smi', float), ('ema_low', float), ('ema_high', float), ('smi', float), ('smi_ema', float), ('', 'U10' ), ('trend_status', 'U10' ), ('outofchannel_status', 'U10' ), ('bb_lower', float ), ('bb_upper', float), ('atr_lower', float), ('atr_upper', float ), ('ha_open', float), ('ha_high', float),('ha_low', float),('ha_close', float)  ])
+        ('Stop_Loss', float), ('Take_Profit', float), ('direction_smi', float), ('crossover_smi', float), ('ema_low', float), ('ema_high', float), ('smi', float), ('smi_ema', float), ('trend_status', 'U10' ), ('outofchannel_status', 'U10' ), ('bb_lower', float ), ('bb_upper', float), ('atr_lower', float), ('atr_upper', float ), ('ha_open', float), ('ha_high', float),('ha_low', float),('ha_close', float)  ])
 
 
     column_names = dt.names
@@ -1209,6 +1220,63 @@ class sorting:
         return sorted_data, signal_list
 
     @classmethod
+    def adx_channel_trading(cls):
+
+        # ('smi', float), ('smi_ema', float), ('trend_status', 'U10'), ('outofchannel_status', 'U10')
+        # "-1 lower breakout" , "1 upper breakout"
+
+        strategy = "adx_channel_trading"
+        sort_index, sell_signal_list, buy_signal_list = [], [], []
+        for index, ohlc in enumerate(bar_df[sorting.values]):
+            observe = ohlc[-last_candles:]
+            last_candle = ohlc[-1:]
+            # over_sold, over_bought = -40.0 , 40.0
+            volatile_adx   = (observe['Average-Directional-Index'] >= 18) & (observe['Average-Directional-Index'] < 31)
+            channel_status_uptrend = (observe['outofchannel_status'] == '0 no breakout') | (observe['outofchannel_status'] == '1 upper breakout')
+
+            slope_uptrend  = (observe['trend_status'] == "uptrend_increasing") | (observe['trend_status'] == "uptrend" )
+            mask_uptrend_crossover = observe['Direction'] == 1.0
+            uptrend_heikin_ashi    = observe['Heikin-Ashi-Status'] == 'Green'
+            uptrend_trigger        = (last_candle['smi']  < 40.0) | (last_candle['trend_status'] == "uptrend_increasing")
+
+            channel_status_downtrend = (observe['outofchannel_status'] == '0 no breakout') | (observe['outofchannel_status'] == '-1 lower breakout')
+
+            slope_downtrend = (observe['trend_status'] == "downtrend_increasing") | (observe['trend_status'] == "downtrend")
+            downtrend_heikin_ashi    = observe['Heikin-Ashi-Status'] == 'Red'
+            mask_downtrend_crossover = observe['Direction'] == -1.0
+            downtrend_trigger        = (last_candle['smi'] > -40.0) | (last_candle['trend_status'] == "downtrend_increasing")
+
+            find_s, find_b = volatile_adx & channel_status & slope_downtrend & mask_downtrend_crossover & downtrend_heikin_ashi, volatile_adx & channel_status & slope_uptrend & mask_uptrend_crossover & uptrend_heikin_ashi
+            matches_s = observe[find_s]
+            matches_b = observe[find_b]
+
+            if np.any(last_three_rows_age_condition) and downtrend_trigger : pass
+
+            if len(matches_s) > 0 and len(matches_b) > 0:
+                matches_s, matches_b = cls.clean_duplicate(find_s, find_b, observe)
+
+            if len(matches_s) > 0 and downtrend_trigger :
+                sort_index.append(index)
+                symbol, order, take_profit, stop_loss, time = cls.get_signal_data(matches_s, order_type=-1)
+                sell_signal = [symbol, order, take_profit, stop_loss, strategy, time, chart_type]
+                sell_signal_list.append(sell_signal)
+
+            if len(matches_b) > 0 and uptrend_trigger:
+                sort_index.append(index)
+                symbol, order, take_profit, stop_loss, time = cls.get_signal_data(matches_b, order_type=1)
+                buy_signal = [symbol, order, take_profit, stop_loss, strategy, time, chart_type]
+                buy_signal_list.append(buy_signal)
+
+        sorted_data = [bar_df[sorting.values][i] for i in range(len(bar_df[sorting.values])) if i in sort_index]
+
+        return sorted_data, sell_signal_list, buy_signal_list
+
+        # "uptrend_increasing", "uptrend"
+        # "downtrend_decreasing", "downtrend"
+        # pass
+
+
+    @classmethod
     def adx_stochastic_momentum_crossover(cls, bar_df, last_candles=10, cross_only=False, chart_type=None):
         strategy = "stochastic_momentum_crossover"
         sort_index, sell_signal_list, buy_signal_list = [], [], []
@@ -1225,10 +1293,10 @@ class sorting:
 
             if cross_only:
                 find_s, find_b = mask_downtrend_crossover, mask_uptrend_crossover
-            else:
-                find_s, find_b = volatile_adx & mask_downtrend_crossover & downtrend_heikin_ashi, volatile_adx & mask_uptrend_crossover & uptrend_heikin_ashi
+            else: find_s, find_b = volatile_adx & channel_status & slope_downtrend & mask_downtrend_crossover & downtrend_heikin_ashi, volatile_adx & channel_status & slope_uptrend & mask_uptrend_crossover & uptrend_heikin_ashi
             matches_s = observe[find_s]
             matches_b = observe[find_b]
+
 
             if len(matches_s) > 0 and len(matches_b) > 0:
                 matches_s, matches_b = cls.clean_duplicate(find_s, find_b, observe)
