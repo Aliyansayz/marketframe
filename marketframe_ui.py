@@ -1,15 +1,18 @@
 from marketframe  import  get_clean_data
 from marketframe  import  resample_data
-from marketframe  import   access_indicators
+from marketframe  import  access_indicators
+from marketframe  import  indicators_lookback_mode
 
-from marketframe  import indicators_lookback_mode
 from marketframe  import  sorting
+from marketframe  import  sorting_indices_crypto
 
 
 class marketframe_run:
-    strategy_list = None
-    resample_list = None
-    market_df     = None
+    strategy_list = ["ema_crossover_direction", "stochastic_crossover_direction"]
+    market_source = None
+    market_data   = None
+    market_info   = None
+    string_args, num_args = None , None
     buy_signal_list, sell_signal_list = [] , []
     @classmethod
     def get_clean_data_resample_data(cls,string_args, num_args):
@@ -23,18 +26,32 @@ class marketframe_run:
         hour, minute  = string_args[2], string_args[3]
         timezone = string_args[5]
         step = int(num_args[0])
-
-        cls.strategy_list = string_args[-1]
+        pass
+        cls.ema_period = [int(num_args[1]), int(num_args[2])]
+        cls.atr_period, cls.atr_multiplier, cls.adx_period = int(num_args[3]), float(num_args[4]), int(num_args[5])
+        cls.last_candles = int(num_args[7])
+        cls.lookback     = int(num_args[6])
+        cls.ha_ohlc      = int(string_args[-2])
+        cls.cross_only   = int(num_args[-1])
+        pass
+        # cls.strategy_list = string_args[-1]
         # ha_ohlc, strategy
-        if timeframe == "Hour": interval = str(hour[:2])
-        else : interval = str(minute)+"m"
+        if timeframe == "Hour":
+            interval = str(hour[:2])
+            cls.chart_type = str(int(int(hour[0]) * step)) + str(f"{hour[-1]}")
+
+        else:
+            interval = str(minute)+"m"
+            interval = str(hour[:2])
+            cls.chart_type = str(int(int(minute) * step)) + str(f"{interval[-1]}")
 
         if timezone == "gmt": format = None
         else: format = timezone
 
         bar_list = get_clean_data.get_data_np_df(symbols = symbols, interval=interval , period=period )
+
         resample = resample_data( data_list=bar_list, step= step , rotate = False , format = format )        # resample = resample_data( data_list=bar_list , step=4 , rotate = False)
-        cls.resample_list = resample.run_resample_data()
+        cls.market_data = resample.run_resample_data()
         # chart = str(menu_hour.get()[:2])
         # if menu_timeframe.get() == "Hour":
         #     chart = str(menu_hour.get()[:2])
@@ -52,56 +69,143 @@ class marketframe_run:
         # resample = resample_data(data_list=bar_list, step=1, rotate=False, format='pkt')
         # resample_list = resample.run_resample_data()
         # cls.resample_list = resample_list
+    @classmethod
+    def set_args(cls, num_args, string_args):
+        cls.ema_period = [int(num_args[1]), int(num_args[2])]
+        cls.atr_period, cls.atr_multiplier, cls.adx_period = int(num_args[3]), float(num_args[4]), int(num_args[5])
+        cls.last_candles = int(num_args[7])
+        cls.lookback = int(num_args[6])
+        cls.ha_ohlc = int(string_args[-2])
+        cls.cross_only = int(num_args[-1])
+
+        if cls.cross_only == 1:  cls.cross_only = True
+        else: cls.cross_only = False
+
+        if cls.ha_ohlc == 1:  cls.ha_ohlc = True
+        else:  cls.ha_ohlc = False
 
     @classmethod
-    def get_signals(cls,string_args, num_args ) :
+    def get_market_info(cls):
 
-        ema_period = [int(num_args[1]), int(num_args[2])]
-        atr_period, atr_multiplier, adx_period = int(num_args[3]), float(num_args[4]), int(num_args[5])
-        last_candles    = int(num_args[7])
-        lookback = int(num_args[6])
-        ha_ohlc  = int(string_args[-2])
-        cross_only = int(num_args[-1])
+        set_args(cls.num_args, cls.string_args)
+        cls.market_info = indicators_lookback_mode.transform_data_list(refine_list=cls.market_data, multiplier=cls.atr_multiplier,
+                                                                       atr_period=cls.atr_period , adx_period=cls.adx_period,
+                                                                       lookback=cls.lookback,
+                                                                       ema_period=cls.ema_period , ha_ohlc=cls.ha_ohlc)
 
-        if cross_only == 1: cross_only = True
-        if ha_ohlc    == 1: ha_ohlc    = True
-        else: ha_ohlc = True
-        cls.market_df = indicators_lookback_mode.transform_data_list(refine_list=cls.resample_list, multiplier=1.7,
-                                                              atr_period=5, adx_period=8, lookback=14,
-                                                              ema_period=[5, 20], ha_ohlc=True)
+    @classmethod
+    def get_signals(cls, try_again= False) :
+
+        if cls.market_info == None or try_again == True:
+            cls.set_args(cls.num_args, cls.string_args)
+            cls.market_info = indicators_lookback_mode.transform_data_list(refine_list=cls.market_data, multiplier=cls.atr_multiplier,
+                                                                           atr_period=cls.atr_period, adx_period=cls.adx_period,
+                                                                           lookback=cls.lookback,  ema_period=cls.ema_period,
+                                                                           ha_ohlc=cls.ha_ohlc)
+
         sell_signal_list, buy_signal_list = [] , []
         for strategy in cls.strategy_list:
-            if  strategy  == "ema_crossover" :
+            if  strategy  == "ema_crossover_direction" :
                 pass
-                sorted_data, sell_signal, buy_signal = sorting.adx_crossover_ema(cls.market_df, last_candles=10, cross_only=False, chart_type=None)
-                sell_signal_list.append(sell_signal)
-                buy_signal_list.append(buy_signal)
+                sorted_data, sell_signal, buy_signal = sorting.adx_crossover_ema(cls.market_info, last_candles=cls.last_candles, cross_only=cls.cross_only, chart_type=cls.chart_type)
+                sell_signal_list.append(sell_signal), buy_signal_list.append(buy_signal)
+                sorted_data, sell_signal, buy_signal = sorting.adx_direction_ema(cls.market_info,last_candles=cls.last_candles, cross_only=cls.cross_only, chart_type=cls.chart_type)
+                sell_signal_list.extend(sell_signal), buy_signal_list.extend(buy_signal)
 
-            elif strategy  == "stochastic":
+            elif strategy  == "stochastic_crossover_direction":
                 pass
-                sorted_data, sell_signal, buy_signal = sorting.adx_stochastic_momentum(cls.market_df, last_candles=30, cross_only=True, chart_type=None)
-                sell_signal_list.append(sell_signal)
-                buy_signal_list.append(buy_signal)
+                sorted_data, sell_signal, buy_signal = sorting.adx_stochastic_momentum_crossover(cls.market_info, last_candles=cls.last_candles, cross_only=False, chart_type=cls.chart_type)
+                sell_signal_list.append(sell_signal), buy_signal_list.append(buy_signal)
+                sorted_data, sell_signal, buy_signal = sorting.adx_stochastic_momentum_direction(cls.market_info, last_candles=cls.last_candles,cross_only=cls.cross_only, chart_type=cls.chart_type)
+                sell_signal_list.extend(sell_signal), buy_signal_list.extend(buy_signal)
+
         cls.sell_signal_list , cls.buy_signal_list = sell_signal_list, buy_signal_list
+        print(sell_signal_list)
+        print(buy_signal_list)
 
+    @classmethod
+    def get_signals_indices_crypto(cls, try_again= False) :
+
+        if cls.market_info == None or try_again == True:
+            cls.market_info = indicators_lookback_mode.transform_data_list(refine_list=cls.market_data, multiplier=cls.atr_multiplier,
+                                                                           atr_period=cls.atr_period, adx_period=cls.adx_period,
+                                                                           lookback=cls.lookback,  ema_period=cls.ema_period,
+                                                                           ha_ohlc=cls.ha_ohlc)
+
+        sell_signal_list, buy_signal_list = [], []
+        for strategy in cls.strategy_list:
+            if strategy == "ema_crossover_direction":
+                pass
+                sorted_data, sell_signal, buy_signal = sorting_indices_crypto.adx_crossover_ema(cls.market_info,last_candles=cls.last_candles,cross_only=cls.cross_only,chart_type=cls.chart_type)
+                sell_signal_list.append(sell_signal), buy_signal_list.append(buy_signal)
+                sorted_data, sell_signal, buy_signal = sorting_indices_crypto.adx_crossover_ema(cls.market_info,last_candles=cls.last_candles,cross_only=cls.cross_only,chart_type=cls.chart_type)
+                sell_signal_list.extend(sell_signal), buy_signal_list.extend(buy_signal)
+
+            elif strategy == "stochastic_crossover_direction":
+                pass
+                sorted_data, sell_signal, buy_signal = sorting_indices_crypto.adx_stochastic_momentum_crossover(cls.market_info,last_candles=cls.last_candles,cross_only=False,chart_type=None)
+                sell_signal_list.append(sell_signal), buy_signal_list.append(buy_signal)
+                sorted_data, sell_signal, buy_signal = sorting_indices_crypto.adx_stochastic_momentum_direction(cls.market_info,last_candles=cls.last_candles,cross_only=cls.cross_only,chart_type=cls.chart_type)
+                sell_signal_list.extend(sell_signal), buy_signal_list.extend(buy_signal)
+
+        cls.sell_signal_list, cls.buy_signal_list = sell_signal_list, buy_signal_list
 
     @classmethod
     def show_results(cls):
 
-        strategy_list = [ [] ] * len(cls.strategy_list)
-        for index, strategy in enumerate(cls.strategy_list):
+        # strategy_list = [[]] * len(cls.strategy_list)
+        sell_textbox.delete("1.0", "end")
+        buy_textbox.delete("1.0", "end")
+        for index, buy_s in enumerate(cls.buy_signal_list):
+                buy_textbox.insert("end", buy_s)
+                buy_textbox.insert("end", "\n")
 
-            if strategy == "ema_crossover":
-               buy_textbox.insert("end",f"#####{strategy}#####")
-               buy_textbox.insert("end", cls.buy_signal_list[index] )
-               sell_textbox.insert("end", f"#####{strategy}#####")
-               sell_textbox.insert("end", cls.sell_signal_list[index] )
+        for index, sell_s in enumerate(cls.sell_signal_list):
+                sell_textbox.insert("end", sell_s)
+                sell_textbox.insert("end", "\n")
 
-            elif strategy == "stochastic":
-                buy_textbox.insert("end",f"#####{strategy}#####")
-                buy_textbox.insert("end", cls.buy_signal_list[index])
-                sell_textbox.insert("end",f"#####{strategy}#####")
-                sell_textbox.insert("end", cls.sell_signal_list[index])
+    # @classmethod
+    # def show_results(cls):
+    #
+    #     strategy_list = [ [] ] * len(cls.strategy_list)
+    #     sell_textbox.delete("1.0", "end")
+    #     buy_textbox.delete("1.0" , "end")
+    #     for index, strategy in enumerate(cls.strategy_list):
+    #
+    #         buy_textbox.insert("end", f"\n#{strategy}#\n")
+    #         sell_textbox.insert("end", f"\n#{strategy}#\n")
+    #
+    #         buy_s = [[]] * len(cls.buy_signal_list[index])
+    #         for i,signal in enumerate(cls.buy_signal_list[index]):
+    #             buy_s[i] = [f"\nsymbol: {signal[0]}\n", f"order_type: {signal[1]}\n",
+    #                      f"take_profit: {signal[2]}\n" + f"stop_loss: {signal[3]}\n" +
+    #                      f"strategy: {signal[4]}\n", f"time: {signal[5]}\n"]
+    #
+    #         sell_s = [[]] * len(cls.sell_signal_list[index])
+    #         for i,signal in enumerate(cls.sell_signal_list[index]):
+    #             sell_s[i] = [f"\nsymbol: {signal[0]}\n", f"order_type: {signal[1]}\n",
+    #                      f"take_profit: {signal[2]}\n" + f"stop_loss: {signal[3]}\n" +
+    #                      f"strategy: {signal[4]}\n", f"time: {signal[5]}\n", ]
+    #
+    #         if strategy == "ema_crossover_direction":
+    #
+    #             buy_textbox.insert("end", buy_s)
+    #             buy_textbox.insert("end", "\n")
+    #             sell_textbox.insert("end", sell_s)
+    #             sell_textbox.insert("end", "\n")
+    #
+    #         elif strategy == "stochastic_crossover_direction":
+    #             buy_textbox.insert("end", buy_s)
+    #             buy_textbox.insert("end", "\n")
+    #             sell_textbox.insert("end", sell_s)
+    #             sell_textbox.insert("end", "\n")
+
+    @classmethod
+    def reset_app(cls):
+
+        cls.market_source = None
+        cls.market_data   = None
+        cls.market_info   = None
 
                 # strategy_list[index] =
         # bar_df = indicators_lookback_mode.transform_data_list(refine_list=resample_list, multiplier=1.7, \
@@ -114,8 +218,6 @@ import tkinter.filedialog as filedialog
 import pickle
 
 class ui_store(marketframe_run):
-
-
 
     @classmethod
     def get_default(cls, filename):
@@ -139,13 +241,13 @@ class ui_store(marketframe_run):
 
         def show_log():
             if log_checkbox.get():
-                output_log.grid(row=5, column=2, padx=(2, 2), pady=(15, 0) )
+                output_log.grid(row=5, column=2, padx=(2, 2), pady=(0, 0) )
             else:
                 output_log.grid_forget()
 
-        log_checkbox = ctk.CTkCheckBox(root, text="Show Logs", height=5, width=7)
+        log_checkbox = ctk.CTkCheckBox(root, text="Show Logs", height=3, width=7,  hover_color="#39FF14" )
         log_checkbox.configure(command=show_log)
-        log_checkbox.grid(row=4, column=3, columnspan=3, padx=(2, 2), pady=(1, 1))
+        log_checkbox.grid(row=5, column=4, columnspan=5, padx=(2, 2), pady=(1, 1))
 
         output_log = ctk.CTkTextbox(root, height=40, width=300)
         # output_log.grid(row=5, column=2)
@@ -211,12 +313,12 @@ class ui_store(marketframe_run):
     @classmethod
     def sell_signal_textbox(cls, root, row, column):
         global sell_textbox
-        sell_signal_textbox = ctk.CTkScrollableFrame(master=root, label_text="Sell Signal")
+        sell_signal_textbox = ctk.CTkScrollableFrame(master=root, width=270, label_text="Sell Signal")
 
         sell_signal_textbox.grid(row=row, column=column, pady=(8, 8), sticky="nsew")
         color = "white"
 
-        sell_textbox = ctk.CTkTextbox(sell_signal_textbox, width=250, text_color=color,
+        sell_textbox = ctk.CTkTextbox(sell_signal_textbox, width=270, text_color=color,
                                  font=ctk.CTkFont(size=20, weight="bold"), fg_color="black")
         sell_textbox.grid(row=0, column=0, sticky="nsew")  # Placed to the right
 
@@ -224,11 +326,11 @@ class ui_store(marketframe_run):
     def buy_signal_textbox(cls, root, row, column):
         global  buy_textbox
 
-        buy_signal_textbox = ctk.CTkScrollableFrame(master=root, label_text="Buy Signal")
+        buy_signal_textbox = ctk.CTkScrollableFrame(master=root, width=270, label_text="Buy Signal")
 
-        buy_signal_textbox.grid(row=row, column=column, pady=(8, 8), sticky="nsew")
+        buy_signal_textbox.grid(row=row,  column=column, pady=(8, 8), sticky="nsew")
         color = "yellow"
-        buy_textbox = ctk.CTkTextbox(buy_signal_textbox, width=250, text_color=color,
+        buy_textbox = ctk.CTkTextbox(buy_signal_textbox, width=270, text_color=color,
                                  font=ctk.CTkFont(size=20, weight="bold"), fg_color="black")
         buy_textbox.grid(row=0, column=0, sticky="nsew")  # Placed to the right
 
@@ -251,10 +353,10 @@ class checkbox(ui_store):
         for i, pair in enumerate(strategy_values):
             row_strategy = i + 1
             col = 0
-            checkbox = ctk.CTkCheckBox(master=root, text=strategy_values[i])
-            checkbox.configure(command=lambda pair=pair: cls.update_strategy_textbox )
-            strategy_checkboxes.append(checkbox)
-            checkbox.grid(row=row_strategy, column=col, columnspan=4, pady=(5, 0), sticky="nw")
+            checkbox_strat = ctk.CTkCheckBox(master=root, text=str(strategy_values[i]) )
+            checkbox_strat.configure(command=lambda pair=pair: cls.update_strategy_textbox )
+            strategy_checkboxes.append(checkbox_strat)
+            checkbox_strat.grid(row=row_strategy, column=col, columnspan=4, pady=(5, 0), sticky="nw")
 
     @classmethod
     def update_strategy_textbox(cls):
@@ -264,9 +366,9 @@ class checkbox(ui_store):
                 values_text = "\n".join(strategy_values)
             else:
                 # Otherwise, show only selected pairs
-                for check in strategy_checkboxes:
-                    if check.get():
-                        values_text += check.cget("text") + "\n"  #
+                for checkbox_strat in strategy_checkboxes:
+                    if checkbox_strat.get():
+                        values_text += checkbox_strat.cget("text") + "\n"  #
             output_log.delete("1.0", "end")
             output_log.insert("end", values_text)
             print(values_text)
@@ -288,19 +390,30 @@ class checkbox(ui_store):
             return [pair for checkbox, pair in zip(strategy_checkboxes, strategy_values) if checkbox.get()]
 
     @classmethod
-    def symbols_checkbox(cls, root, symbols, row): # row --> 1
+    def symbols_checkbox(cls, root, symbols, row, symbols_checked= None ): # row --> 1
         global all_checkbox, checkboxes, textbox
         columns = 4
         # Placed first
-        textbox = ctk.CTkTextbox(root, width=250 , font=ctk.CTkFont(size=20, weight="bold"))
+        textbox = ctk.CTkTextbox(root, width=250 , font=ctk.CTkFont(size=15, weight="bold"))
         textbox.grid(row=0, column=4, sticky="nsew")  # Placed to the right
+        time_to_trade = []
+        aus_time = "Sydney Session (Australia)\n Opens at 10:00 PM GMT\n Closes at 7:00 AM GMT\n"
+        jp_time  = "Tokyo Session (Japan):\n Opens at 12:00 AM GMT\n Closes at 9:00 AM GMT\n"
+        eur_uk_time =  "London Session (United Kingdom):\n Opens at 8:00 AM GMT\n Closes at 5:00 PM GMT\n"
+        us_time = "New York Session (United States):\n Opens at 1:00 PM GMT\n Closes at 10:00 PM GMT\n"
+        time_to_trade.append(aus_time) ,  time_to_trade.append(jp_time)
+        time_to_trade.append(eur_uk_time), time_to_trade.append(us_time)
+        textbox.insert("1.0", time_to_trade)
+
+        cls.forex_sessions_info = time_to_trade
+        # time_to_trade = "1:00PM ->  10:00PM \nPST "
 
         scrollable_frame = ctk.CTkScrollableFrame(root, label_text="Available Symbols List")
         scrollable_frame.grid(row=row, column=4, padx=(20, 20), pady=(20, 0), sticky="nsew")
         scrollable_frame.grid_columnconfigure(0, weight=2)
 
         # Create an "All Symbols" checkbox
-        all_checkbox = ctk.CTkCheckBox(master=scrollable_frame, text="All Symbols", fg_color="#39FF14" )
+        all_checkbox = ctk.CTkCheckBox(master=scrollable_frame, text="All Symbols", fg_color="#39FF14",  hover_color="#39FF14" )
         all_checkbox.configure(command=cls.toggle_checkboxes)
         all_checkbox.grid(row=0, columnspan=columns, sticky="w")
 
@@ -308,10 +421,23 @@ class checkbox(ui_store):
         for i, pair in enumerate(symbols):
             row = i + 1
             col = 0
-            checkbox = ctk.CTkCheckBox(master=scrollable_frame, text=symbols[i][:6], fg_color="#39FF14" )
+            checkbox = ctk.CTkCheckBox(master=scrollable_frame, text=symbols[i][:6], fg_color="#39FF14",  hover_color="#39FF14" )
             checkbox.configure(command=lambda pair=pair: cls.update_textbox())
+            if symbols_checked :
+                if len(symbols_checked) == len(symbols) : cls.toggle_checkboxes()
+                if checkbox.cget("text") in symbols_checked:
+                    checkbox.select()
+                    cls.update_textbox()
+                    # values_text += checkbox.cget("text") + "\n"
+                    # textbox.delete("1.0", "end")
+                    # textbox.insert("end", values_text)
+
             checkboxes.append(checkbox)
             checkbox.grid(row=row, column=col, sticky="nw")
+
+            # if  checkbox.cget("text") in symbols_checked:
+            #     checkbox.select()
+
 
     @classmethod
     def toggle_checkboxes(cls):
@@ -337,6 +463,7 @@ class checkbox(ui_store):
                     values_text += checkbox.cget("text") + "\n"  # Added "=X" for
         textbox.delete("1.0", "end")
         textbox.insert("end", values_text)
+        # cls.asset_state["asset_type"][f"{asset_type}"]["symbols_checkbox"] = #####
 
 
     @classmethod
@@ -354,6 +481,7 @@ class checkbox(ui_store):
             #     # pass
             print(selected_pairs)
         # ['EURUSD=X', 'GBPUSD=X', 'USDJPY=X', 'AUDUSD=X', 'USDCAD=X']
+
     @classmethod
     def symbols_name_checkbox(cls, root, symbols, row, names):  # row --> 1
         global all_checkbox, checkboxes, textbox
@@ -362,13 +490,14 @@ class checkbox(ui_store):
         # Placed first
         textbox = ctk.CTkTextbox(root, width=250, font=ctk.CTkFont(size=20, weight="bold"))
         textbox.grid(row=0, column=4, sticky="nsew")  # Placed to the right
-
+        time_to_trade = "1:00PM ->  10:00PM \nPST "
+        textbox.insert("1.0", time_to_trade)
         scrollable_frame = ctk.CTkScrollableFrame(root, label_text="Available Symbols List")
         scrollable_frame.grid(row=row, column=4, padx=(20, 20), pady=(20, 0), sticky="nsew")
         scrollable_frame.grid_columnconfigure(0, weight=2)
 
         # Create an "All Symbols" checkbox
-        all_checkbox = ctk.CTkCheckBox(master=scrollable_frame, text="All Symbols", fg_color="#39FF14" )
+        all_checkbox = ctk.CTkCheckBox(master=scrollable_frame, text="All Symbols", fg_color="#39FF14",  hover_color="#39FF14")
         all_checkbox.configure(command=cls.toggle_checkboxes)
         all_checkbox.grid(row=0, columnspan=columns, sticky="w")
 
@@ -376,7 +505,36 @@ class checkbox(ui_store):
         for i, pair in enumerate(symbols):
             row = i + 1
             col = 0
-            checkbox = ctk.CTkCheckBox(master=scrollable_frame, text=symbol_name[i][:-3], fg_color="#39FF14")
+            checkbox = ctk.CTkCheckBox(master=scrollable_frame, text=symbol_name[i], fg_color="#39FF14",  hover_color="#39FF14")
+            checkbox.configure(command=lambda pair=pair: cls.update_textbox())
+            checkboxes.append(checkbox)
+            checkbox.grid(row=row, column=col, sticky="nw")
+
+
+    @classmethod
+    def symbols_name_checkbox_crypto(cls, root, symbols, row, names):  # row --> 1
+        global all_checkbox, checkboxes, textbox
+        columns = 4
+        symbol_name = [str(symbols[i]) + " " + str(names[i]) for i in range(len(symbols))]
+        # Placed first
+        textbox = ctk.CTkTextbox(root, width=250, font=ctk.CTkFont(size=20, weight="bold"))
+        textbox.grid(row=0, column=4, sticky="nsew")  # Placed to the right
+        time_to_trade = "1:00PM ->  10:00PM \nPST For Crypto "
+        textbox.insert("1.0", time_to_trade)
+        scrollable_frame = ctk.CTkScrollableFrame(root, label_text="Available Symbols List")
+        scrollable_frame.grid(row=row, column=4, padx=(20, 20), pady=(20, 0), sticky="nsew")
+        scrollable_frame.grid_columnconfigure(0, weight=2)
+
+        # Create an "All Symbols" checkbox
+        all_checkbox = ctk.CTkCheckBox(master=scrollable_frame, text="All Symbols", fg_color="#39FF14",  hover_color="#39FF14")
+        all_checkbox.configure(command=cls.toggle_checkboxes)
+        all_checkbox.grid(row=0, columnspan=columns, sticky="w")
+
+        checkboxes = []
+        for i, pair in enumerate(symbols):
+            row = i + 1
+            col = 0
+            checkbox = ctk.CTkCheckBox(master=scrollable_frame, text=symbol_name[i][:-3], fg_color="#39FF14",  hover_color="#39FF14")
             checkbox.configure(command=lambda pair=pair: cls.update_textbox())
             checkboxes.append(checkbox)
             checkbox.grid(row=row, column=col, sticky="nw")
@@ -392,6 +550,7 @@ class tab_ui(checkbox):
         tabview.grid(row=row, column=2, padx=(20, 0), pady=(20, 0), sticky="nsew")
         chart_tab, timezone_tab = "Chart", "Timezone"
         tabview.add(chart_tab)
+
         tabview.add(timezone_tab)
         tabview.tab(chart_tab).grid_columnconfigure(0, weight=0)  # configure grid of individual tabs
 
@@ -414,12 +573,12 @@ class tab_ui(checkbox):
         label_minute = ctk.CTkLabel(master=scrollable_chart_tab, text=placeholder_minute)
         label_minute.grid(row=2, column=0, padx=20, pady=(10, 10))
 
-        menu_minute = ctk.CTkOptionMenu(master=scrollable_chart_tab,   values=["15", "30"])
+        menu_minute = ctk.CTkOptionMenu(master=scrollable_chart_tab, values=["15", "30"])
         menu_minute.grid(row=3, column=0, padx=20, pady=(10, 10))
         menu_minute.set("15")
 
         placeholder_hour = "Select Hour Chart..."
-        label_hour = ctk.CTkLabel(master=scrollable_chart_tab, text=placeholder_hour)
+        label_hour = ctk.CTkLabel(master=scrollable_chart_tab,  text=placeholder_hour)
         label_hour.grid(row=4, column=0, padx=20, pady=(10, 10))
 
         menu_hour = ctk.CTkOptionMenu(master=scrollable_chart_tab,
@@ -457,11 +616,11 @@ class tab_ui(checkbox):
                                           values=["gmt", "pkt"])
         menu_timezone.grid(row=1, column=0, padx=0, pady=(10, 10))
 
-        menu_timeframe.set("Hour")
-        combobox_step.set("1")
-        menu_hour.set("1Hour")
-        menu_period.set("7d")
-        menu_timezone.set("pkt")
+        # menu_timeframe.set("Hour")
+        # combobox_step.set("1")
+        # menu_hour.set("1Hour")
+        # menu_period.set("7d")
+        # menu_timezone.set("pkt")
 
     @classmethod
     def toggle_timeframes(cls, *args):
@@ -478,7 +637,7 @@ class tab_ui(checkbox):
 
     @classmethod
     def indicators_strategy_tab(cls, root, row):
-        global strategies, menu_strategy, option_last_candles, cross_only_check, menu_lower_ema, \
+        global  menu_strategy, option_last_candles, cross_only_check, menu_lower_ema, \
             menu_higher_ema, menu_atr_period, menu_adx_period, menu_atr_multiplier, switch_ha, menu_lookback_period
 
         tabview = ctk.CTkTabview(root, width=250)
@@ -550,11 +709,12 @@ class tab_ui(checkbox):
         switch_ha = ctk.CTkSwitch(master=scrollable_indicator_tab, text="Switch To Heikin Ashi ")
         switch_ha.grid(row=12, column=0, padx=10, pady=(0, 20))
 
-        strategy_values = ["ema_crossover", "stochastic"]
-        cls.strategy_values = strategy_values
+        # strategy_values = ["ema_crossover", "stochastic"]
+        strategy_values = cls.strategy_list
+        # cls.strategy_values = strategy_values
 
         cls.strategy_checkbox(scrollable_strategy_tab, strategy_values )
-        placeholder_strategy = "Select Your Strategy Type"  # Placeholder text
+        # placeholder_strategy = "Select Your Strategy Type"  # Placeholder text
 
         # all_strategy = ctk.CTkCheckBox(master=scrollable_strategy_tab, text="All Strategies")
         # all_strategy.configure(command=cls.toggle_strategy_checkboxes)
@@ -569,14 +729,14 @@ class tab_ui(checkbox):
         #     strategy_checkboxes.append(checkbox)
         #     checkbox.grid(row=row_strategy, column=col, columnspan=4, pady=(5, 0),  sticky="nw")
 
-        menu_lookback_period.set("21")
-        option_last_candles.set("14")
-        menu_atr_multiplier.set("1.7")
-        menu_atr_period.set("5")
-        menu_adx_period.set("10")
-        menu_lower_ema.set("5")
-        menu_higher_ema.set("20")
-        switch_ha.select()
+        # menu_lookback_period.set("21")
+        # option_last_candles.set("14")
+        # menu_atr_multiplier.set("1.7")
+        # menu_atr_period.set("5")
+        # menu_adx_period.set("10")
+        # menu_lower_ema.set("5")
+        # menu_higher_ema.set("20")
+        # switch_ha.select()
 
 
 
@@ -584,7 +744,112 @@ class tab_ui(checkbox):
 class access_ui(tab_ui):
     pass
 
-class marketframe_args(access_ui):
+class marketframe_store(access_ui):
+    previous_asset, current_asset = "forex", ""
+    string_args, num_args = [], []
+    asset_last_state = None
+    asset_state = {
+        "asset_type": {
+            "forex": {
+                "asset_last_state": False, "market_data": [], "sell_textbox": "", "buy_textbox": "", "symbols_checkbox": [],
+                "strategy_checkbox": [],
+                "num_args": 0, "step": "", "adx_period": "", "atr_period_multiplier": [], "lower_higher_ema": [],
+                "lookback_last_candles": [], "chart_period": "", "channel_strength": ""
+            },
+            "crypto": {
+                "asset_last_state": False, "sell_textbox": "", "buy_textbox": "", "symbols_checkbox": [],
+                "strategy_checkbox": [],
+                "num_args": 0, "step": "", "adx_period": "", "atr_period_multiplier": [], "lower_higher_ema": [],
+                "lookback_last_candles": [], "chart_period": "", "channel_strength": ""
+            },
+            "stocks": {
+                "asset_last_state": False, "sell_textbox": "", "buy_textbox": "", "symbols_checkbox": [],
+                "strategy_checkbox": [],
+                "num_args": 0, "step": "", "adx_period": "", "atr_period_multiplier": [], "lower_higher_ema": [],
+                "lookback_last_candles": [], "chart_period": ""},
+            "indices": {
+                "asset_last_state": False, "sell_textbox": "", "buy_textbox": "", "symbols_checkbox": [],
+                "strategy_checkbox": [],
+                "num_args": 0, "step": "", "adx_period": "", "atr_period_multiplier": [], "lower_higher_ema": [],
+                "lookback_last_candles": [], "chart_period": ""}
+
+        }
+    }
+
+    @classmethod
+    def retrieve_asset_state(cls,root, asset_type):
+
+        cls.symbols_checked = cls.asset_state["asset_type"][f"{asset_type}"]["symbols_checkbox"]
+        # print(cls.symbols_checked)
+        ## TO BE REMOVED # cls.symbols_checkbox(root, symbols, row=1, symbols_checked=cls.symbols_checked)
+
+
+        # for i, checkbox in enumerate(checkboxes):
+        #     if  checkbox.cget("text") in cls.symbols_checked:
+        #         checkbox.select()
+
+        # strategy_checked = cls.asset_state["asset_type"][f"{asset_type}"]["strategy_checkbox"]
+        # for checkbox, strategy in zip(strategy_checkboxes, strategy_values):
+        #     if checkbox.cget("text") in strategy_checked: checkbox.select()
+
+        # menu_timeframe.set("Hour"), \
+        lookback_last_candles = cls.asset_state["asset_type"][f"{asset_type}"]["lookback_last_candles"]
+        atr_period_multiplier = cls.asset_state["asset_type"][f"{asset_type}"]["atr_period_multiplier"]
+        lower_higher_ema = cls.asset_state["asset_type"][f"{asset_type}"]["lower_higher_ema"]
+        adx_period = cls.asset_state["asset_type"][f"{asset_type}"]["adx_period"]
+
+
+        combobox_step.set("1"), menu_hour.set("1Hour"),
+        menu_period.set("7d"), menu_timezone.set("pkt")
+        pass
+        menu_lookback_period.set(str(lookback_last_candles[0])), \
+        option_last_candles.set(str(lookback_last_candles[1])), \
+        menu_atr_period.set(atr_period_multiplier[0]), menu_atr_multiplier.set(atr_period_multiplier[1])
+
+        menu_adx_period.set(adx_period), \
+        menu_lower_ema.set(str(lower_higher_ema[0])), menu_higher_ema.set(str(lower_higher_ema[1])),
+        switch_ha.select()
+
+        sell_text = cls.asset_state["asset_type"][f"{asset_type}"]["sell_textbox"]
+        buy_text  = cls.asset_state["asset_type"][f"{asset_type}"]["buy_textbox"]
+
+        try:
+            sell_textbox.insert("end", sell_text)
+            buy_textbox.insert("end", buy_text)
+            cls.market_data = cls.asset_state["asset_type"][f"{asset_type}"]["market_data"]
+        except:
+            pass
+
+    # ["asset_type"]["forex"]["symbols_checkbox"] = buy_textbox
+    @classmethod
+    def store_asset_state(cls, asset_type):
+
+        cls.asset_state["asset_type"][f"{asset_type}"]["asset_last_state"] = True
+        cls.asset_state["asset_type"][f"{asset_type}"]["symbols_checkbox"] = cls.string_args[0]
+        cls.asset_state["asset_type"][f"{asset_type}"]["strategy_checkbox"] = cls.string_args[-1]
+
+        cls.asset_state["asset_type"][f"{asset_type}"]["step"] = cls.num_args[0]
+
+        cls.asset_state["asset_type"][f"{asset_type}"]["adx_period"] = cls.num_args[5]
+
+        cls.asset_state["asset_type"][f"{asset_type}"]["atr_period_multiplier"] = [cls.num_args[3], cls.num_args[4]]
+
+        cls.asset_state["asset_type"][f"{asset_type}"]["lower_higher_ema"] = [cls.num_args[1], cls.num_args[2]]
+
+        cls.asset_state["asset_type"][f"{asset_type}"]["lookback_last_candles"] = [cls.num_args[6], cls.num_args[7]]
+
+        # step, lookback = combobox_step.get(), menu_lookback_period.get()
+        # atr_period, atr_multiplier, adx_period = menu_atr_period.get(), menu_atr_multiplier.get(), menu_adx_period.get()
+        # lower_ema, higher_ema, last_candles
+
+        try:
+            cls.asset_state["asset_type"][f"{asset_type}"]["sell_textbox"] = sell_textbox.get("1.0", "end")
+            cls.asset_state["asset_type"][f"{asset_type}"]["buy_textbox"]  = buy_textbox.get("1.0", "end")
+            cls.asset_state["asset_type"][f"{asset_type}"]["market_data"]  = cls.market_data
+        except:
+            pass
+
+
     @classmethod
     def input_args(cls):
 
@@ -599,51 +864,107 @@ class marketframe_args(access_ui):
         string_args = [symbols, timeframe, hour, minute, period, timezone, ha_ohlc, strategy_list]
         num_args    = [step, lower_ema, higher_ema, atr_period, atr_multiplier, adx_period, lookback, last_candles, cross_check_value ]
 
+        cls.string_args, cls.num_args = string_args, num_args
+
         return  string_args, num_args
 
     @classmethod
-    def run_default_args(cls):
-        pass
+    def set_default_args(cls):
+
+        menu_timeframe.set("Hour"), combobox_step.set("1"), menu_hour.set("1Hour"),
+        menu_period.set("7d"),      menu_timezone.set("pkt")
+        menu_lookback_period.set("21"), option_last_candles.set("14"), menu_atr_multiplier.set("1.7")
+        menu_atr_period.set("5"),menu_adx_period.set("10"), menu_lower_ema.set("5"),
+        menu_higher_ema.set("20"), switch_ha.select()
 
 
+    @classmethod
+    def set_crypto_default_args(cls):
+
+        menu_timeframe.set("Minute"), combobox_step.set("1"), menu_hour.set("1Hour"),
+        menu_period.set("1d"),  menu_timezone.set("gmt")
+        menu_lookback_period.set("21"), option_last_candles.set("14"), menu_atr_multiplier.set("1.7")
+        menu_atr_period.set("5"),  menu_adx_period.set("20"), menu_lower_ema.set("20"),
+        menu_higher_ema.set("50"), switch_ha.select()
 
     @classmethod
     def result_args(cls):
         pass
 
     @classmethod
-    def run_get_signal(cls, *args):
-
+    def run_get_signal_indices_crypto(cls):
         string_args, num_args = cls.input_args()
-        if cls.resample_list != None:
-            cls.get_signals( string_args, num_args)
+        if cls.market_data != None:
+            cls.get_signals_indices_crypto()
 
         else:
             cls.get_clean_data_resample_data(string_args, num_args)
-            cls.get_signals(string_args, num_args)
+            cls.get_signals_indices_crypto()
 
         cls.show_results()
 
-class forex_ui_groups(marketframe_args) :
-    # Function to update the text area based on selected checkboxes
 
+    @classmethod
+    def run_try_again_indices_crypto(cls, *args):
 
-# __________________CODE FOR RESULT TAB__________________________________
-    # result_frame = ctk.CTkScrollableFrame(master=root,
-    #                                       label_text="Indicators Input")
-    # result_frame.grid(row=1, column=2, sticky="nsew")
-    # tabview = ctk.CTkTabview(result_frame, width=250)
-    # tabview.grid(row=1, column=1, padx=(7, 7), pady=(5, 5), sticky="nsew")
-    # for index , strategy_name in strategy :
-    #   tabview.add(strategy_name)
-    #  scrollable_indicator_tab = ctk.CTkScrollableFrame(master=tabview.tab(indicators_tab),
-    #                                                           label_text="Indicators Input")
-    #   textbox = ctk.CTkTextbox(tabview.tab(strategy_name), width=250)
-    #   textbox.grid(row=0, column=4, sticky="nsew")
+        string_args, num_args = cls.input_args()
+        if cls.market_data != None:
+            cls.get_signals(try_again=True)
+
+        cls.show_results()
 
 
     @classmethod
-    def forex_ui(cls, root):
+    def run_get_signal_forex(cls, *args):
+
+        string_args, num_args = cls.input_args()
+        if cls.market_data != None:
+            cls.get_signals()
+
+        else:
+            cls.get_clean_data_resample_data(string_args, num_args)
+            cls.get_signals()
+
+        cls.show_results()
+
+    @classmethod
+    def run_reset_app(cls):
+        cls.reset_app()
+
+
+    @classmethod
+    def run_get_signal(cls, *args):
+
+        string_args, num_args = cls.input_args()
+        if cls.market_data != None:
+            cls.get_signals()
+
+        else:
+            cls.get_clean_data_resample_data(string_args, num_args)
+            cls.get_signals()
+
+        cls.show_results()
+
+    @classmethod
+    def run_try_again(cls, *args):
+
+        string_args, num_args = cls.input_args()
+        if cls.market_data != None:
+            cls.get_signals(try_again=True)
+
+        cls.show_results()
+
+
+    @classmethod
+    def retrieve_state(cls):
+        pass
+
+
+
+class forex_ui_groups(marketframe_store) :
+
+    @classmethod
+    def forex_ui(cls, root, asset_type ):
 
         # global all_checkbox, forex_pairs, checkboxes, textbox
 
@@ -672,72 +993,49 @@ class forex_ui_groups(marketframe_args) :
 
         symbols = forex_pairs
 
-        cls.symbols_checkbox(root, symbols, row=1)
+        pass
+        cls.chart_tab(root, row=1)
+        # cls.chart_tab(root)
+        pass
+        cls.symbols_checkbox(root, symbols=symbols, row=1)
+        cls.indicators_strategy_tab(root, row=1)
 
-        # Create a "Run" button
-        save_button = ctk.CTkButton(root, text="SAVE", height=18, width=90, command=None)
-        save_button.grid(row=4, column=2, columnspan=3, padx=(2,2), pady=(10, 1) )
+        cls.buy_signal_textbox(root, row=0, column=3)
+        cls.sell_signal_textbox(root, row=0, column=2)
 
-        import_button = ctk.CTkButton(root, text="IMPORT", height=18, width=90, command=browse_files)
-        import_button.grid(row=4, column=1, columnspan=3, padx=(2,2), pady=(10, 1) )
+
+
+
 
         signal_button = ctk.CTkButton(root, text="Get Signal", height=22, width=122, command=cls.run_get_signal )
         signal_button.grid(row=4, column=0, columnspan=3, padx=(2,2), pady=(10, 1) )
         signal_button.configure( text_color="#39FF14" , fg_color="black" )
 
-        # global  output_log
-        # output_log = ctk.CTkTextbox(root, height=40, width=300)
-        # output_log.grid(row=5, column=2)
+        try_again_button = ctk.CTkButton(root, text="Try Again", height=22, width=122, command=cls.run_try_again)
+        try_again_button.grid(row=4, column=1, columnspan=3, padx=(2, 2), pady=(10, 1))
+        try_again_button.configure(text_color="#39FF14", fg_color="black")
 
-        # show_popup
+        save_button = ctk.CTkButton(root, text="SAVE", height=22, width=122, command=cls.run_reset_app)
+        save_button.grid(row=4, column=2, columnspan=3, padx=(2, 2), pady=(10, 1))
+        save_button.configure(text_color="#39FF14", fg_color="black")
+
+        reset_button = ctk.CTkButton(root, text="RESET", height=22, width=122, command=cls.run_reset_app )
+        reset_button.grid(row=4, column=4, columnspan=3, padx=(2,2), pady=(10, 1) )
+        reset_button.configure(text_color="red", fg_color="black")
+
         cls.show_hide_output_log(root)
 
-        pass
-        cls.chart_tab(root, row=1)
-        # cls.chart_tab(root)
-        pass
 
-        cls.indicators_strategy_tab(root, row=1)
-        cls.buy_signal_textbox (root, row=0, column=3)
-        cls.sell_signal_textbox(root, row=0, column=2)
-        # cls.signals_textbox(root, strategy= "", row=0, column=2, signal_type="Buy Signal")
-        # cls.signals_textbox(root, strategy= "", row=0, column=3, signal_type="Sell Signal")
+        if cls.asset_state["asset_type"][f"{asset_type}"]["asset_last_state"] == False :
+            cls.set_default_args()
 
-        # cls.signals_textbox(root, strategies, 1)
-        # cls.signals_tab(root, strategies, 2)
+        if cls.asset_state["asset_type"][f"{asset_type}"]["asset_last_state"] == True :
+            cls.retrieve_asset_state(root, asset_type="forex")
 
-        #
-        #
-        # cls.signals_tab(root, strategy="ema_crossover")
-        # def default():
+        cls.asset_state["asset_type"][f"{asset_type}"]["asset_last_state"] = True
 
-        # option_last_candles.set("14")
-        # menu_atr_multiplier.set("1.7")
-        # menu_atr_period.set("5")
-        # menu_adx_period.set("10")
-        # menu_lower_ema.set("5")
-        # menu_higher_ema.set("20")
-         # label_tab_2 = ctk.CTkLabel(master=tabview.tab(timezone_tab), text="CTkLabel on Tab 2")
-        # label_tab_2.grid(row=0, column=0, padx=20, pady=20)
 
-        # placeholder_period = "Select Period Lookback..."  # Placeholder text
-        # menu_period = ctk.CTkComboBox(master=tabview.tab(indicators_tab),
-        #                                      values=[placeholder_period, "7d", "1d"])
-        # menu_period.grid(row=0, column=0, padx=0, pady=(10, 10))
-        # menu_period.configure(command=cls.toggle_timeframes)
-        # menu_period.set("14")
-        #
-        # menu_period.bind("<<ComboboxSelected>>", lambda event: menu_period.set("")
-        #                     if menu_period.get() == placeholder_period else None)
-        #
-        #
-        # # switch_ha.select()
-        # # switch_ha.configue()
-        # print(switch_ha.get())
-        # if switch_ha.get() == 1 : print(True)
 
-        # entry = ctk.CTkEntry(master=tabview.tab("CTkTabview"), placeholder_text="Time value")
-        # entry.grid(row=2, column=1, columnspan=2, padx=(20, 0), pady=(20, 20), sticky="nsew")
     @classmethod
     def forex_args(cls):
 
@@ -844,36 +1142,12 @@ class forex_ui_groups(marketframe_args) :
             return [pair for checkbox, pair in zip(checkboxes, symbols) if checkbox.get()]
 
 
+class crypto_ui_groups(marketframe_store):
+
     @classmethod
-    def get_data_args(cls):
+    def crypto_ui(cls,  root, asset_type ):
 
-        chart = str(menu_hour.get()[:2])
-        if menu_timeframe.get() == "Hour":
-            chart = str(menu_hour.get()[:2])
-
-        elif menu_timeframe.get() == "Minute":
-            chart = str(menu_minute.get()[:2])
-
-        interval = chart
-        step = int(combobox_step.get())
-        chart_type = str(int(int(chart[0]) * step)) + str(f"{chart[-1]}")
-        selected_symbols = cls.get_selected_pairs()
-
-        timezone = str(menu_timezone.get())
-
-        return selected_symbols, interval, timezone, chart_type
-
-
-
-class crypto_ui_groups(marketframe_args):
-
-        @classmethod
-        def crypto_ui(cls, root):
-
-
-
-            global symbols
-            symbols = [
+        crypto_symbols = [
             "BTC-USD", "ETH-USD", "USDT-USD", "BNB-USD", "SOL-USD", "XRP-USD", "USDC-USD", "ADA-USD", "STETH-USD",
             "AVAX-USD", "DOGE-USD", "DOT-USD", "MATIC-USD", "WTRX-USD", "TRX-USD", "LINK-USD", "TON-USD",
             "WBTC-USD", "SHIB-USD", "LTC-USD", "DAI-USD", "WEOS-USD", "BCH-USD", "UNI-USD", "ICP-USD", "ATOM-USD",
@@ -885,63 +1159,131 @@ class crypto_ui_groups(marketframe_args):
             "MANA-USD", "NEO-USD", "KAVA-USD", "EOS-USD", "HEX-USD", "BONK-USD", "IOTA-USD", "BEAM-USD", "ROSE-USD",
             "CAKE-USD", "SUI-USD", "GALA-USD", "LUNC-USD", "KLAY-USD", "CHEEL-USD", "BGB-USD", "OSMO-USD",
             "XDC-USD", "WOO-USD"
-            ]
+        ]
 
-            names = [
-                "Bitcoin USD","Ethereum USD","Tether USD","BNB USD","Solana USD", "XRP USD",
-                "USD Coin USD", "Cardano USD", "Lido Staked ETH USD", "Avalanche USD", "Dogecoin USD", "Polkadot USD",
-                "Polygon USD", "Wrapped TRON USD", "TRON USD", "Chainlink USD", "Toncoin USD", "Wrapped Bitcoin USD",
-                "Shiba Inu USD", "Litecoin USD", "Dai USD", "Wrapped EOS USD", "Bitcoin Cash USD", "Uniswap USD",
-                "Internet Computer USD", "Cosmos USD", "UNUS SED LEO USD", "Stellar USD", "NEAR Protocol USD",
-                "OKB USD", "Optimism USD", "Ethereum Classic USD", "Aptos USD", "Monero USD", "Immutable USD",
-                "Hedera USD", "Injective USD", "Wrapped HBAR USD", "Filecoin USD", "Kaspa USD", "VeChain USD",
-                "Bitcoin Classic USD", "Cronos USD", "Lido DAO USD", "TrueUSD USD", "Bitcoin BEP2 USD", "Stacks USD",
-                "Mantle USD", "Energi Dollar USD", "Bitcoin SV USD", "Arbitrum USD", "Celestia USD",
-                "Wrapped Beacon ETH USD", "MultiversX USD", "Algorand USD", "THORChain USD", "First Digital USD USD",
-                "The Graph USD", "Render USD", "BitTorrent(New) USD", "Helium USD", "BUSD USD", "KuCoin Token USD",
-                "Tezos USD", "WEMIX USD", "FTX Token USD", "Decentraland USD", "Neo USD", "Kava USD", "EOS USD",
-                "HEX USD", "Bonk USD", "IOTA USD", "Beam USD", "Oasis Network USD", "PancakeSwap USD", "Sui USD",
-                "Gala USD", "Terra Classic USD", "Klaytn USD", "Cheelee USD", "Bitget Token USD", "Osmosis USD",
-                "XDC Network USD", "WOO Network USD"
-            ]
+        names = [
+            "Bitcoin USD", "Ethereum USD", "Tether USD", "BNB USD", "Solana USD", "XRP USD",
+            "USD Coin USD", "Cardano USD", "Lido Staked ETH USD", "Avalanche USD", "Dogecoin USD", "Polkadot USD",
+            "Polygon USD", "Wrapped TRON USD", "TRON USD", "Chainlink USD", "Toncoin USD", "Wrapped Bitcoin USD",
+            "Shiba Inu USD", "Litecoin USD", "Dai USD", "Wrapped EOS USD", "Bitcoin Cash USD", "Uniswap USD",
+            "Internet Computer USD", "Cosmos USD", "UNUS SED LEO USD", "Stellar USD", "NEAR Protocol USD",
+            "OKB USD", "Optimism USD", "Ethereum Classic USD", "Aptos USD", "Monero USD", "Immutable USD",
+            "Hedera USD", "Injective USD", "Wrapped HBAR USD", "Filecoin USD", "Kaspa USD", "VeChain USD",
+            "Bitcoin Classic USD", "Cronos USD", "Lido DAO USD", "TrueUSD USD", "Bitcoin BEP2 USD", "Stacks USD",
+            "Mantle USD", "Energi Dollar USD", "Bitcoin SV USD", "Arbitrum USD", "Celestia USD",
+            "Wrapped Beacon ETH USD", "MultiversX USD", "Algorand USD", "THORChain USD", "First Digital USD USD",
+            "The Graph USD", "Render USD", "BitTorrent(New) USD", "Helium USD", "BUSD USD", "KuCoin Token USD",
+            "Tezos USD", "WEMIX USD", "FTX Token USD", "Decentraland USD", "Neo USD", "Kava USD", "EOS USD",
+            "HEX USD", "Bonk USD", "IOTA USD", "Beam USD", "Oasis Network USD", "PancakeSwap USD", "Sui USD",
+            "Gala USD", "Terra Classic USD", "Klaytn USD", "Cheelee USD", "Bitget Token USD", "Osmosis USD",
+            "XDC Network USD", "WOO Network USD"
+        ]
+        global  symbols
+        symbols = crypto_symbols
 
-            symbols = symbols
-            # Number of columns for checkboxes
-            # def button_click(root):
-            #     ctk.CTkMessageBox.showinfo("Button Clicked", "You clicked the button in the root window!")
-            #
-            # button = ctk.CTkButton(root, text="Click Me", command=lambda: button_click(root))
-            # button.grid(row=0, column=2, columnspan=3, padx=(2,2), pady=(10, 1) )  # Add some padding around the button
+        pass
+        cls.chart_tab(root, row=1)
+        # cls.chart_tab(root)
+        pass
+        cls.symbols_name_checkbox_crypto(root, symbols=symbols, row=1, names=names)
+        cls.indicators_strategy_tab(root, row=1)
 
-            # cls.symbols_checkbox(root, symbols)
-            # cls.symbols_checkbox(root, symbols, row=1)
+        cls.buy_signal_textbox(root, row=0, column=3)
+        cls.sell_signal_textbox(root, row=0, column=2)
 
-            cls.symbols_name_checkbox(root, symbols, row=1, names=names )
+        if cls.asset_state["asset_type"][f"{asset_type}"]["asset_last_state"] == False:
+            cls.set_crypto_default_args()
+
+        if cls.asset_state["asset_type"][f"{asset_type}"]["asset_last_state"] == True:
+            cls.retrieve_asset_state(root, asset_type="crypto")
+
+
+        signal_button = ctk.CTkButton(root, text="Get Signal", height=22, width=122, command=cls.run_get_signal_indices_crypto )
+        signal_button.grid(row=4, column=0, columnspan=3, padx=(2, 2), pady=(10, 1))
+        signal_button.configure(text_color="#39FF14", fg_color="black")
+
+        try_again_button = ctk.CTkButton(root, text="Try Again", height=22, width=122, command=cls.run_try_again_indices_crypto )
+        try_again_button.grid(row=4, column=1, columnspan=3, padx=(2, 2), pady=(10, 1))
+        try_again_button.configure(text_color="#39FF14", fg_color="black")
+
+        save_button = ctk.CTkButton(root, text="SAVE", height=22, width=122, command=cls.run_reset_app)
+        save_button.grid(row=4, column=2, columnspan=3, padx=(2, 2), pady=(10, 1))
+        save_button.configure(text_color="#39FF14", fg_color="black")
+
+        reset_button = ctk.CTkButton(root, text="RESET", height=22, width=122, command=cls.run_reset_app)
+        reset_button.grid(row=4, column=4, columnspan=3, padx=(2, 2), pady=(10, 1))
+        reset_button.configure(text_color="red", fg_color="black")
+
+        cls.show_hide_output_log(root)
+
+
+
+        cls.asset_state["asset_type"][f"{asset_type}"]["asset_last_state"] = True
+
+
+
+class indices_ui_groups(marketframe_store):
+
+        @classmethod
+        def indices_ui(cls, root, asset_type ):
+
+
+
+            commodities = ["GC=F"]
+            indices = [ "GC=F", "^IXIC", "^GSPC", "^DJI", "^NYA", "^VIX", "^N100", "^DJI", "^FTSE", "^N225", "^BFX", "^STOXX50E",
+                       "^HSI", "^GDAXI", "^FCHI", "^RUT"]
+
+            indices_name = ["GOLD", "Nasdaq", "S&P 500", "DOW jones", "NYSE", "CBOE Volatility Index", "Euronext 100 Index",
+                            "UK100", "Nikkei Osaka",
+                            "^BFX Brussel", "Zurich", "EURO STOXX 50 Index", "Hong kong", "Germany index",
+                            "CAC 40 Index", "Russell 2000"]
+
+            # Nasdaq , S&P 500,  DOW jones, NYSE, CBOE Volatility Index,  DOW Jones , UK100 ,  Nikkei Osaka , ^BFX Brussel, Zurich, Hong kong, Germany index
+            #  , Paris , Russell 2000
+            global  symbols
+
+
+            symbols = indices
 
             # Create a "Run" button
-            # save_button = ctk.CTkButton(root, text="SAVE", height=18, width=90, command=None)
-            # save_button.grid(row=4, column=2, columnspan=3, padx=(2, 2), pady=(10, 1))
-            #
-            # import_button = ctk.CTkButton(root, text="IMPORT", height=18, width=90, command=None)
-            # import_button.grid(row=4, column=1, columnspan=3, padx=(2, 2), pady=(10, 1))
-            #
-            # setting_button = ctk.CTkButton(root, text="Settings", height=18, width=90, command=cls.show_popup)
-            # setting_button.grid(row=4, column=0, columnspan=3, padx=(2, 2), pady=(10, 1))
 
-            # global  output_log
-            # output_log = ctk.CTkTextbox(root, height=40, width=300)
-            # output_log.grid(row=5, column=2)
 
-            # show_popup
-            cls.show_hide_output_log(root)
 
+            signal_button = ctk.CTkButton(root, text="Get Signal", height=22, width=122, command=cls.run_get_signal_indices_crypto )
+            signal_button.grid(row=4, column=0, columnspan=3, padx=(2, 2), pady=(10, 1))
+            signal_button.configure(text_color="#39FF14", fg_color="black")
+
+            try_again_button = ctk.CTkButton(root, text="Try Again", height=22, width=122, command=cls.run_try_again_indices_crypto)
+            try_again_button.grid(row=4, column=1, columnspan=3, padx=(2, 2), pady=(10, 1))
+            try_again_button.configure(text_color="#39FF14", fg_color="black")
+
+            save_button = ctk.CTkButton(root, text="SAVE", height=22, width=122, command=cls.run_reset_app)
+            save_button.grid(row=4, column=2, columnspan=3, padx=(2, 2), pady=(10, 1))
+            save_button.configure(text_color="#39FF14", fg_color="black")
+
+            reset_button = ctk.CTkButton(root, text="RESET", height=22, width=122, command=cls.run_reset_app)
+            reset_button.grid(row=4, column=4, columnspan=3, padx=(2, 2), pady=(10, 1))
+            reset_button.configure(text_color="red", fg_color="black")
+            cls.symbols_name_checkbox(root, symbols=symbols, row=1, names=indices_name)
             pass
             cls.chart_tab(root, row=1)
             # cls.chart_tab(root)
             pass
 
             cls.indicators_strategy_tab(root, row=1)
-            cls.signals_textbox(root, strategy="", row=0, column=2, signal_type="Buy Signal")
-            cls.signals_textbox(root, strategy="", row=0, column=3, signal_type="Sell Signal")
+
+            cls.buy_signal_textbox(root, row=0, column=3)
+            cls.sell_signal_textbox(root, row=0, column=2)
+
+            if cls.asset_state["asset_type"][f"{asset_type}"]["asset_last_state"] == False:
+
+                cls.set_crypto_default_args()
+
+            if cls.asset_state["asset_type"][f"{asset_type}"]["asset_last_state"] == True:
+                cls.retrieve_asset_state(root, asset_type="indices")
+
+            cls.show_hide_output_log(root)
+            cls.asset_state["asset_type"][f"{asset_type}"]["asset_last_state"] = True
+
 
 
