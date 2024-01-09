@@ -1,6 +1,6 @@
 import customtkinter as ctk
-from marketframe_ui import  forex_ui_groups , crypto_ui_groups
-
+from marketframe_ui import  forex_ui_groups , crypto_ui_groups, indices_ui_groups
+from marketframe_ui import ui_store , marketframe_store
 
 # ctk.set_appearance_mode("System")  # Modes: "System" (standard), "Dark", "Light"
 
@@ -9,7 +9,7 @@ from marketframe_ui import  forex_ui_groups , crypto_ui_groups
 
 
 
-class app_frame_store:
+class app_frame_store(marketframe_store):
 
     @classmethod
     def sidebar(cls, root):
@@ -27,7 +27,7 @@ class app_frame_store:
                               "#45B8AC"]  # Ultra Violet, Mimosa #EFC050,Tangerine Tango,  Emerald
         side_button_text_colors = ["#39FF14", "#fe4005", "#04d9ff", "#FFDF00", "#6B5B95"]
 
-        asset_type = ['FOREX', "CRYPTO", 'INDICES', 'STOCKS COMMODITIES']
+        asset_type = ['FOREX', 'INDICES', 'CRYPTO', 'STOCKS']
 
         sidebar_buttons = []
         for i, asset in enumerate(asset_type):
@@ -41,6 +41,7 @@ class app_frame_store:
 
         for i, button in enumerate(sidebar_buttons):
             asset = asset_type[i]
+
             button.bind("<Button-1>", lambda e, asset=asset: cls.switch_frame(asset))
 
     @classmethod
@@ -79,19 +80,30 @@ class create_asset_frame(app_frame_store):
             frame.title = asset
 
 
-            if asset=="FOREX":
-                forex_ui_groups.forex_ui(frame)
+            print(cls.asset_state["asset_type"][cls.current_asset]["asset_last_state"])
 
+            if asset=="FOREX":
+                forex_ui_groups.forex_ui(frame, cls.current_asset )
+                cls.previous_asset = str(asset).lower()
 
             elif asset=="CRYPTO":
-                crypto_ui_groups.crypto_ui(frame)
+                crypto_ui_groups.crypto_ui(frame, cls.current_asset )
+                cls.previous_asset = str(asset).lower()
 
+            elif asset == "INDICES":
+                indices_ui_groups.indices_ui(frame, cls.current_asset )
+                cls.previous_asset = str(asset).lower()
 
-
-
+######################## Will Decide To Remove Asset Type From Dictionary OR Not
     @classmethod
     def switch_frame(cls, asset):
 
+        if cls.asset_state["asset_type"][cls.previous_asset]["asset_last_state"] == True:
+            cls.string_args, cls.num_args = cls.input_args()
+            cls.store_asset_state(cls.previous_asset)
+
+                 # store previous_asset state
+        cls.current_asset = str(asset).lower()
         cls.asset_frame(frame, asset)
 
 
@@ -109,13 +121,14 @@ class run_app(create_asset_frame):
         root.grid_rowconfigure((0, 1, 2), weight=1)
         root.geometry(f"{1100}x{580}")
 
+
         cls.sidebar(root)
         cls.appearance_mode_button( sidebar)
         frame = cls.create_frame(root)
 
         asset_type = ['FOREX', "CRYPTO", 'INDICES', 'STOCKS COMMODITIES']
 
-
+        print(cls.current_asset)
 
         # cls.asset_frame(f"{asset_type[0]}", frame)
 
