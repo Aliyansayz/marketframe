@@ -3,7 +3,6 @@ bar_df = indicators_lookback_mode.transform_data_list( refine_list = refined_lis
 print(bar_df)
 
 """
-from numpy.lib.recfunctions import append_fields
 
 class  indicators_lookback_mode( access_indicators ):
 
@@ -14,31 +13,33 @@ class  indicators_lookback_mode( access_indicators ):
     values    = 1
     indicator = cls() # universal class of project => access_indicator
 
-    heikin_ashi = indicator.get_heikin_ashi (bar_list = refine_list,  ohlc_data=True)
-
-    # crossover_direction_list  =  adx_atr_bands_indicator.crossover_direction_lookback(bar_list = refine_list, lookback = lookback )
-    ha_status_list = indicator.get_heikin_ashi ( refine_list, lookback = lookback)
-    if ha_ohlc :
-      refine_list = indicator.normal_to_ha(data_list = refine_list, ha_ohlc_list = heikin_ashi )
-
-    ha_ohlc_list = indicator.get_heikin_ashi (bar_list = refine_list, lookback = lookback, ohlc_data=True)
 
     crossover_direction_list   =  indicator.crossover_direction_lookback(bar_list = refine_list, ema_period = ema_period ,lookback = lookback )
 
     stochastic_momentum_list =  indicator.stochastic_momentum_lookback( bar_list = refine_list, period = ema_period[1], lookback = lookback, ema_period = 5)
-
     stochastic_momentum_crossover_list = indicator.stochastic_momentum_lookback( bar_list = refine_list, period = ema_period[1], lookback = lookback, ema_period = ema_period[0], crossover_direction=True)
-    emaz_list  =  indicator.ema_lookback( bar_list = refine_list, lookback = lookback , ema_period = ema_period )
 
-    atr_bands_list = indicator.atr_bands_lookback( refine_list , multiplier,  period = atr_period ,  lookback = lookback  )
-    adx_value_list = indicator.adx_lookback( bar_list = refine_list,   period = adx_period , lookback = lookback)
+    emaz_list = indicator.ema_lookback(bar_list=refine_list, lookback=lookback, ema_period=ema_period)
 
-    channel_list, trend_outofchannel_list = indicator.get_linear_regression_channel_lookback(bar_list= refine_list , period=21, dev_multiplier=2.0, lookback = lookback )
+    adx_value_list = indicator.adx_lookback(bar_list=refine_list, period=adx_period, lookback=lookback)
+    atr_bands_list = indicator.atr_bands_lookback(refine_list, multiplier, period=atr_period, lookback=lookback)
+
+    channel_list, trend_outofchannel_list = indicator.get_linear_regression_channel_lookback(bar_list=refine_list, period=21, dev_multiplier=2.0, lookback=lookback)
+
     bollinger_bands_list = indicator.get_bollinger_bands( bar_list= refine_list, lookback = lookback )
+
+
+    # crossover_direction_list  =  adx_atr_bands_indicator.crossover_direction_lookback(bar_list = refine_list, lookback = lookback )
+    ha_status_list = indicator.get_heikin_ashi ( refine_list, lookback = lookback)
+    heikin_ashi = indicator.get_heikin_ashi (bar_list = refine_list,  ohlc_data=True)
+
+    if ha_ohlc :
+      refine_list = indicator.normal_to_ha(data_list = refine_list, ha_ohlc_list = heikin_ashi )
+    ha_ohlc_list = indicator.get_heikin_ashi (bar_list = refine_list, lookback = lookback, ohlc_data=True)
 
     # lookback = 10
     dt   = np.dtype([ ('index', 'datetime64[h]'),  ('symbol', 'U20'), ('Open', float ), ('High', float ), ('Low', float),  ('Close', float ),  ('Heikin-Ashi-Status', 'U10'),  ('Direction', float), ('Average-Directional-Index', float), ('Crossover', float),   \
-        ('Stop_Loss', float), ('Take_Profit', float), ('direction_smi', float), ('crossover_smi', float), ('ema_low', float), ('ema_high', float), ('smi', float), ('smi_ema', float), ('', 'U10' ), ('trend_status', 'U10' ), ('outofchannel_status', 'U10' ), ('bb_lower', float ), ('bb_upper', float), ('atr_lower', float), ('atr_upper', float ), ('ha_open', float), ('ha_high', float),('ha_low', float),('ha_close', float)  ])
+        ('Stop_Loss', float), ('Take_Profit', float), ('direction_smi', float), ('crossover_smi', float), ('ema_low', float), ('ema_high', float), ('smi', float), ('smi_ema', float), ('trend_status', 'U10' ), ('outofchannel_status', 'U10' ), ('bb_lower', float ), ('bb_upper', float), ('atr_lower', float), ('atr_upper', float ), ('ha_open', float), ('ha_high', float),('ha_low', float),('ha_close', float)  ])
 
 
     column_names = dt.names
